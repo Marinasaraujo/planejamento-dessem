@@ -126,6 +126,7 @@ label {
 }
 
 input[type="text"],
+input[type="search"],
 select {
   width: 100%;
   min-height: 46px;
@@ -167,6 +168,7 @@ select[multiple] option {
 }
 
 input:disabled,
+input[type="search"]:disabled,
 select:disabled {
   background: #f1f4f8;
   color: var(--texto-suave);

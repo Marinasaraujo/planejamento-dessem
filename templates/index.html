@@ -133,45 +133,25 @@
         </p>
 
         <div class="campo">
-          <label for="usinas-hidreletricas">
-            Usinas hidrelétricas
-          </label>
-
-          <br>
-
-          <select
-            id="usinas-hidreletricas"
-            name="codigos_uhe"
-            multiple
-            size="5"
-            aria-describedby="ajuda-usinas"
-            disabled
-          >
-            <option disabled>
-              Aguardando leitura do deck
-            </option>
+          <label for="usinas-hidreletricas">Usinas hidrelétricas</label><br>
+          <label class="rotulo-busca" for="busca-uhe">Buscar hidrelétrica por nome ou código</label>
+          <input type="search" id="busca-uhe" placeholder="Ex.: Paraibuna" autocomplete="off" disabled aria-controls="usinas-hidreletricas" aria-describedby="resumo-uhe">
+          <select id="usinas-hidreletricas" name="codigos_uhe" multiple size="5" disabled aria-describedby="ajuda-usinas">
+            <option disabled>Aguardando leitura do deck</option>
           </select>
+          <p id="resumo-uhe" class="resumo-busca" role="status">Carregue o deck para buscar hidrelétricas.</p>
+          <button type="button" id="limpar-uhe" class="botao-secundario" disabled>Limpar seleção de UHEs</button>
         </div>
 
         <div class="campo">
-          <label for="usinas-termeletricas">
-            Usinas termelétricas
-          </label>
-
-          <br>
-
-          <select
-            id="usinas-termeletricas"
-            name="codigos_ute"
-            multiple
-            size="5"
-            aria-describedby="ajuda-usinas"
-            disabled
-          >
-            <option disabled>
-              Aguardando leitura do deck
-            </option>
+          <label for="usinas-termeletricas">Usinas termelétricas</label><br>
+          <label class="rotulo-busca" for="busca-ute">Buscar termelétrica por nome ou código</label>
+          <input type="search" id="busca-ute" placeholder="Ex.: Angra" autocomplete="off" disabled aria-controls="usinas-termeletricas" aria-describedby="resumo-ute">
+          <select id="usinas-termeletricas" name="codigos_ute" multiple size="5" disabled aria-describedby="ajuda-usinas">
+            <option disabled>Aguardando leitura do deck</option>
           </select>
+          <p id="resumo-ute" class="resumo-busca" role="status">Carregue o deck para buscar termelétricas.</p>
+          <button type="button" id="limpar-ute" class="botao-secundario" disabled>Limpar seleção de UTEs</button>
         </div>
       </fieldset>
 
@@ -367,6 +347,10 @@
 
         <pre id="json-caso"><code>Nenhum dado preparado.</code></pre>
       </details>
+      <details id="origens-dados">
+        <summary>Ver origem dos dados e defaults utilizados</summary>
+        <pre id="json-origens"><code>Nenhum dado preparado.</code></pre>
+      </details>
     </section>
   </main>
 
@@ -376,6 +360,5 @@
     </p>
   </footer>
 
-  <!-- O arquivo JavaScript será conectado em uma etapa posterior. -->
 </body>
 </html>

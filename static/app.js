@@ -20,6 +20,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     uhe: elemento("usinas-hidreletricas"),
     ute: elemento("usinas-termeletricas"),
+    buscaUhe: elemento("busca-uhe"),
+    buscaUte: elemento("busca-ute"),
+    resumoUhe: elemento("resumo-uhe"),
+    resumoUte: elemento("resumo-ute"),
+    limparUhe: elemento("limpar-uhe"),
+    limparUte: elemento("limpar-ute"),
     submercado: elemento("submercado"),
 
     fonte: elemento("fonte-afluencias"),
@@ -40,7 +46,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // 2. Estado da aplicação nesta página.
   const estado = {
     deckId: null,
-    ocupado: false
+    ocupado: false,
+    catalogos: {
+      uhe: [],
+      ute: []
+    }
   };
 
   // Identifica se a página foi aberta por HTTP ou diretamente como arquivo.
@@ -57,6 +67,71 @@ document.addEventListener("DOMContentLoaded", () => {
   const selecionados = (select) => {
     return [...select.selectedOptions].map((opcao) => opcao.value);
   };
+
+  // Compara texto sem diferenciar maiúsculas, minúsculas ou acentos.
+  const normalizarBusca = (valor) => String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .trim();
+
+  function configurarBusca(select, campo, resumo, botao) {
+    const quantidade = estado.catalogos[campo].length;
+    const escolhidos = new Set(selecionados(select));
+    const termo = normalizarBusca(select.dataset.termoBusca);
+    const catalogo = estado.catalogos[campo];
+    const filtrados = catalogo.filter((item) => {
+      const texto = normalizarBusca(`${item.nome} ${item.codigo}`);
+      return !termo || texto.includes(termo);
+    });
+    const visiveis = new Map(filtrados.map((item) => [String(item.codigo), item]));
+
+    // Mantém no select o que foi escolhido mesmo quando saiu do filtro.
+    for (const item of catalogo) {
+      const codigo = String(item.codigo);
+      if (escolhidos.has(codigo) && !visiveis.has(codigo)) {
+        visiveis.set(codigo, item);
+      }
+    }
+
+    select.replaceChildren();
+    for (const item of visiveis.values()) {
+      const codigo = String(item.codigo);
+      const foraDoFiltro = termo && !filtrados.some(
+        (filtrado) => String(filtrado.codigo) === codigo
+      );
+      const rotulo = foraDoFiltro
+        ? `${item.nome} — ${item.codigo} (selecionada; fora do filtro)`
+        : `${item.nome} — ${item.codigo}`;
+      const opcao = new Option(rotulo, codigo, false, escolhidos.has(codigo));
+      select.add(opcao);
+    }
+
+    const selecionadosAgora = selecionados(select).length;
+    resumo.textContent = termo
+      ? `${filtrados.length} de ${quantidade} usina(s) exibida(s). ` +
+        `${selecionadosAgora} selecionada(s).`
+      : `${quantidade} usina(s) disponível(is). ` +
+        `${selecionadosAgora} selecionada(s).`;
+    botao.disabled = estado.ocupado || estado.deckId === null || selecionadosAgora === 0;
+  }
+
+  function aplicarBusca(tipo) {
+    const select = tipo === "uhe" ? tela.uhe : tela.ute;
+    const campo = tipo === "uhe" ? "uhe" : "ute";
+    const busca = tipo === "uhe" ? tela.buscaUhe : tela.buscaUte;
+    const resumo = tipo === "uhe" ? tela.resumoUhe : tela.resumoUte;
+    const botao = tipo === "uhe" ? tela.limparUhe : tela.limparUte;
+    select.dataset.termoBusca = busca.value;
+    configurarBusca(select, campo, resumo, botao);
+  }
+
+  function limparSelecao(tipo) {
+    const select = tipo === "uhe" ? tela.uhe : tela.ute;
+    for (const opcao of select.options) opcao.selected = false;
+    aplicarBusca(tipo);
+    limparResultados();
+  }
 
   // Habilita os campos conforme a etapa atual.
   function atualizarControles() {
@@ -82,6 +157,15 @@ document.addEventListener("DOMContentLoaded", () => {
       tela.fonte
     ]) {
       campo.disabled = estado.ocupado || semDeck;
+    }
+
+    for (const campo of [tela.buscaUhe, tela.buscaUte]) {
+      campo.disabled = estado.ocupado || semDeck;
+    }
+
+    for (const botao of [tela.limparUhe, tela.limparUte]) {
+      botao.disabled = estado.ocupado || semDeck ||
+        selecionados(botao === tela.limparUhe ? tela.uhe : tela.ute).length === 0;
     }
 
     tela.ano.disabled =
@@ -264,6 +348,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Descarta o caso anterior ao trocar a configuração do deck.
   function invalidarDeck() {
     estado.deckId = null;
+    estado.catalogos.uhe = [];
+    estado.catalogos.ute = [];
+    tela.buscaUhe.value = "";
+    tela.buscaUte.value = "";
 
     preencherSelect(
       tela.uhe,
@@ -401,6 +489,11 @@ document.addEventListener("DOMContentLoaded", () => {
         "Selecione as UTEs",
         true
       );
+
+      estado.catalogos.uhe = dados.uhe;
+      estado.catalogos.ute = dados.ute;
+      aplicarBusca("uhe");
+      aplicarBusca("ute");
 
       preencherSelect(
         tela.submercado,
@@ -577,6 +670,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   tela.carregar.addEventListener("click", carregarDeck);
   tela.preparar.addEventListener("click", prepararCaso);
+
+  tela.buscaUhe.addEventListener("input", () => aplicarBusca("uhe"));
+  tela.buscaUte.addEventListener("input", () => aplicarBusca("ute"));
+  tela.limparUhe.addEventListener("click", () => limparSelecao("uhe"));
+  tela.limparUte.addEventListener("click", () => limparSelecao("ute"));
+  tela.uhe.addEventListener("change", () => aplicarBusca("uhe"));
+  tela.ute.addEventListener("change", () => aplicarBusca("ute"));
 
   // Configuração inicial da interface.
   invalidarDeck();
