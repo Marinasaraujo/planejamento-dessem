@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Seleção e consulta de dados de entrada de um deck DESSEM.">
+
+  <title>DESSEM | Explorador de dados</title>
+
+  <!-- Link com o css -->
+  <!-- link rel="stylesheet" href="../static/style.css -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='style.css') }}"
+  >
+
+  <!-- Link com o javascript -->
+  <!-- script src="../static/app.js" defer></script -->
+  <script
+    src="{{ url_for('static', filename='app.js') }}"
+    defer
+  ></script>
+  
+</head>
+
+<body>
+  <header class="cabecalho">
+    <h1>Explorador de dados DESSEM</h1>
+
+    <p>
+      Selecione usinas, carga e afluências para preparar seu caso de estudo.
+    </p>
+
+    <p id="status-aplicacao" role="status">
+      Etapa inicial: interface sem conexão com o leitor de dados.
+    </p>
+  </header>
+
+  <main id="conteudo-principal">
+    <form
+      id="formulario-caso"
+      aria-describedby="orientacao-formulario"
+    >
+      <p id="orientacao-formulario">
+        As opções de usinas e submercados serão preenchidas após a leitura
+        do deck.
+      </p>
+
+      <!-- 1. A escolha da origem será tratada pelo JavaScript. -->
+       <!-- Esse id e class que fazem a conexão entre html e css -->
+      <fieldset id="configuracao-deck" class="painel">
+        <legend>1. Deck DESSEM</legend>
+
+        <p>
+          Deck padrão: <strong>29/10/2026</strong>
+        </p>
+
+        <p>
+          <code>DS_CCEE_102026_SEMREDE_RV4D29</code>
+        </p>
+
+        <p>
+          <input
+            type="radio"
+            id="origem-padrao"
+            name="origem_deck"
+            value="padrao"
+            checked
+          >
+
+          <label for="origem-padrao">
+            Usar o deck padrão de 29/10/2026
+          </label>
+        </p>
+
+        <p>
+          <input
+            type="radio"
+            id="origem-diretorio"
+            name="origem_deck"
+            value="diretorio"
+          >
+
+          <label for="origem-diretorio">
+            Usar outro deck por diretório
+          </label>
+        </p>
+
+        <p>
+          <label for="diretorio-deck">
+            Diretório do outro deck
+          </label>
+
+          <br>
+
+          <input
+            type="text"
+            id="diretorio-deck"
+            name="diretorio_deck"
+            placeholder="C:\caminho\para\o\deck"
+            spellcheck="false"
+            aria-describedby="ajuda-diretorio"
+          >
+        </p>
+
+        <p id="ajuda-diretorio">
+          Utilizado na opção de outro deck. Informe a pasta completa que
+          contém o dessem.arq e os arquivos referenciados.
+          O caminho será lido pelo servidor Python.
+        </p>
+
+        <button
+          type="button"
+          id="botao-carregar-deck"
+          aria-describedby="status-deck"
+          disabled
+        >
+          Carregar deck
+        </button>
+
+        <p id="status-deck" role="status">
+          Leitura ainda não conectada. Nenhum deck carregado.
+        </p>
+      </fieldset>
+
+      <!-- 2. Cada option receberá o código da usina como value. -->
+      <fieldset id="configuracao-usinas" class="painel">
+        <legend>2. Usinas do estudo</legend>
+
+        <p id="ajuda-usinas">
+          Selecione uma ou mais usinas de cada tipo.
+          As listas virão do deck carregado.
+        </p>
+
+        <div class="campo">
+          <label for="usinas-hidreletricas">
+            Usinas hidrelétricas
+          </label>
+
+          <br>
+
+          <select
+            id="usinas-hidreletricas"
+            name="codigos_uhe"
+            multiple
+            size="5"
+            aria-describedby="ajuda-usinas"
+            disabled
+          >
+            <option disabled>
+              Aguardando leitura do deck
+            </option>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label for="usinas-termeletricas">
+            Usinas termelétricas
+          </label>
+
+          <br>
+
+          <select
+            id="usinas-termeletricas"
+            name="codigos_ute"
+            multiple
+            size="5"
+            aria-describedby="ajuda-usinas"
+            disabled
+          >
+            <option disabled>
+              Aguardando leitura do deck
+            </option>
+          </select>
+        </div>
+      </fieldset>
+
+      <!-- 3. Os submercados também serão obtidos do deck. -->
+      <fieldset id="configuracao-carga" class="painel">
+        <legend>3. Carga</legend>
+
+        <label for="submercado">
+          Submercado
+        </label>
+
+        <br>
+
+        <select
+          id="submercado"
+          name="codigo_submercado"
+          aria-describedby="ajuda-carga"
+          disabled
+        >
+          <option value="" selected>
+            Aguardando leitura do deck
+          </option>
+        </select>
+
+        <p id="ajuda-carga">
+          A carga será apresentada em MW, nos períodos do deck
+          e com suas respectivas durações.
+        </p>
+      </fieldset>
+
+      <!-- 4. Ano e médias dependem de uma base histórica adicional. -->
+      <fieldset id="configuracao-afluencias" class="painel">
+        <legend>4. Afluências</legend>
+
+        <label for="fonte-afluencias">
+          Fonte das afluências
+        </label>
+
+        <br>
+
+        <select
+          id="fonte-afluencias"
+          name="fonte_afluencias"
+          aria-describedby="ajuda-afluencias"
+          disabled
+        >
+          <option value="deck" selected>
+            Afluências do deck (DADVAZ)
+          </option>
+
+          <option value="ano_historico" disabled>
+            Ano histórico — requer base histórica
+          </option>
+
+          <option value="media_historica" disabled>
+            Médias históricas — requer base histórica
+          </option>
+        </select>
+
+        <p>
+          <label for="ano-afluencias">
+            Ano histórico
+          </label>
+
+          <br>
+
+          <select
+            id="ano-afluencias"
+            name="ano_afluencias"
+            disabled
+          >
+            <option value="" selected>
+              Aguardando base histórica
+            </option>
+          </select>
+        </p>
+
+        <p id="ajuda-afluencias">
+          Afluências em m³/s. Os anos disponíveis e o período usado nas
+          médias serão informados a partir da base histórica.
+        </p>
+      </fieldset>
+
+      <p>
+        <button
+          type="button"
+          id="botao-preparar-caso"
+          disabled
+        >
+          Preparar dados selecionados
+        </button>
+      </p>
+    </form>
+
+    <!-- Os resultados reais serão inseridos pelo JavaScript. -->
+    <section
+      id="dados-selecionados"
+      class="painel"
+      aria-labelledby="titulo-dados"
+    >
+      <h2 id="titulo-dados">
+        Dados selecionados
+      </h2>
+
+      <p id="status-selecao" role="status">
+        Nenhum caso preparado.
+      </p>
+
+      <section aria-labelledby="titulo-uhe">
+        <h3 id="titulo-uhe">
+          Hidrelétricas
+        </h3>
+
+        <table id="tabela-uhe">
+          <caption>
+            Cadastro e condições iniciais das UHEs selecionadas
+          </caption>
+
+          <thead>
+            <tr>
+              <th scope="col">Código</th>
+              <th scope="col">Nome</th>
+              <th scope="col">Volume mínimo (hm³)</th>
+              <th scope="col">Volume máximo (hm³)</th>
+              <th scope="col">Volume inicial (hm³)</th>
+            </tr>
+          </thead>
+
+          <tbody id="corpo-tabela-uhe">
+            <tr>
+              <td colspan="5">
+                Aguardando seleção e consulta dos dados.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="titulo-ute">
+        <h3 id="titulo-ute">
+          Termelétricas
+        </h3>
+
+        <table id="tabela-ute">
+          <caption>
+            Identificação das UTEs e de suas unidades geradoras
+          </caption>
+
+          <thead>
+            <tr>
+              <th scope="col">Código da usina</th>
+              <th scope="col">Nome</th>
+              <th scope="col">Unidade geradora</th>
+            </tr>
+          </thead>
+
+          <tbody id="corpo-tabela-ute">
+            <tr>
+              <td colspan="3">
+                Aguardando seleção e consulta dos dados.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="titulo-series">
+        <h3 id="titulo-series">
+          Carga e afluências
+        </h3>
+
+        <div id="dados-carga">
+          <p>
+            A série de carga será exibida após a consulta.
+          </p>
+        </div>
+
+        <div id="dados-afluencias">
+          <p>
+            As séries de afluência serão exibidas após a consulta.
+          </p>
+        </div>
+      </section>
+
+      <details id="estrutura-modelo">
+        <summary>
+          Ver estrutura de dados para o modelo
+        </summary>
+
+        <p>
+          Este espaço exibirá o caso preparado em JSON.
+        </p>
+
+        <pre id="json-caso"><code>Nenhum dado preparado.</code></pre>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      Exploração e preparação de dados de entrada do DESSEM.
+    </p>
+  </footer>
+
+  <!-- O arquivo JavaScript será conectado em uma etapa posterior. -->
+</body>
+</html>
