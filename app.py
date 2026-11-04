@@ -17,7 +17,8 @@ from flask import (
 
 from werkzeug.exceptions import HTTPException
 
-from leitor_dessem import carregar_deck, listar_catalogos
+from leitor_dessem import carregar_deck, listar_catalogos, listar_demandas
+from preparacao import montar_sistema, origens_dados
 
 
 # 1. Configuração da aplicação.
@@ -33,7 +34,8 @@ app.config["DECK_PADRAO"] = (
     BASE_DIR / "DS_CCEE_102026_SEMREDE_RV4D29"
 )
 
-# Guarda os decks na memória enquanto o servidor estiver rodando.
+# Memória do processo: o deck é lido uma vez e reutilizado nas consultas.
+# Cada sessão do navegador acessa apenas o seu deck atual.
 decks = {}
 
 
@@ -184,8 +186,6 @@ def api_carregar_deck():
         deck_id=deck_id,
         nome=pasta.name,
         data_referencia=referencia,
-
-        # Inclui uhe, ute e submercados na resposta.
         **catalogos,
 
         historico={
@@ -195,7 +195,8 @@ def api_carregar_deck():
 
         avisos=[
             "Nesta etapa são consultados os catálogos; "
-            "carga e afluências ainda não são extraídas."
+            "a carga DP será extraída após a seleção do submercado; "
+            "afluências ainda não são extraídas."
         ],
     )
 
@@ -203,8 +204,7 @@ def api_carregar_deck():
 # 5. Rota chamada pelo botão "Consultar seleção".
 @app.post("/api/caso/preparar")
 def api_consultar_selecao():
-    """Retorna uma prévia cadastral das escolhas do usuário."""
-
+    """Monta o sistema da seleção usando dados cadastrais e defaults."""
     dados = receber_json()
     deck_id = dados.get("deck_id")
 
@@ -248,35 +248,38 @@ def api_consultar_selecao():
         "submercados",
     )[0]
 
+    try:
+        carga = listar_demandas(
+            deck["caso"],
+            submercado["codigo"],
+        )
+    except (ValueError, KeyError, TypeError) as erro:
+        return jsonify(
+            erro=f"Não foi possível consultar a carga: {erro}"
+        ), 400
+
     if dados.get("fonte_afluencias", "deck") != "deck":
-        abort(
-            400,
-            description=(
-                "A base histórica de afluências "
-                "ainda não foi conectada."
-            ),
-        )
+        abort(400, description="A base histórica de afluências ainda não foi conectada.")
 
-    pendencias = [
-        "Séries de carga e afluência ainda não consultadas."
-    ]
+    try:
+        sistema = montar_sistema(uhe, ute, caso=deck["caso"])
+    except (ValueError, KeyError, TypeError) as erro:
+        return jsonify(erro=f"Não foi possível montar o sistema: {erro}"), 400
 
+    pendencias = ["Durações de 0,5 h e custo de déficit default."]
     if uhe:
-        pendencias.append(
-            "Volumes iniciais e condições operativas "
-            "das UHEs ainda não consultados."
-        )
-
+        pendencias.append("VI calculado a 50% do volume útil; Prod, Engol e Afl defaults. Cascata ainda não tratada.")
     if ute:
-        pendencias.append(
-            "Unidades geradoras, limites e custos "
-            "das UTEs ainda não consultados."
-        )
+        pendencias.append("Um gerador equivalente por UTE, com parâmetros térmicos defaults.")
 
     return jsonify(
-        etapa="selecao",
+        etapa="preparacao_com_defaults",
+        estrutura_validada=True,
+        usa_defaults=True,
+        # Ainda não representa as condições operativas reais do deck.
         pronto_para_modelo=False,
-
+        sistema=sistema,
+        origens=origens_dados(),
         metadados={
             "deck": deck["nome"],
             "data_referencia": deck["data_referencia"],
@@ -289,12 +292,12 @@ def api_consultar_selecao():
             "codigo_submercado": submercado["codigo"],
             "fonte_afluencias_solicitada": "deck",
         },
-
-        uhe=uhe,
+        uhe=[{**dados, "volume_inicial_hm3":modelo["VI"], "origem_volume_inicial":"default"}
+             for dados, modelo in zip(uhe, sistema["UHE"])],
         ute=ute,
 
         periodos=[],
-        carga=[],
+        carga=carga,
         afluencias=[],
 
         pendencias=pendencias,

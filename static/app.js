@@ -292,6 +292,16 @@ document.addEventListener("DOMContentLoaded", () => {
   function mostrarSerie(destino, linhas, colunas, descricao) {
     destino.replaceChildren();
 
+    if (
+      linhas.length > 0 &&
+      typeof linhas[0] !== "object"
+    ) {
+      linhas = linhas.map((valor) => ({ valor }));
+      colunas = [
+        { campo: "valor", titulo: "Carga (MW)" }
+      ];
+    }
+
     const tabela = document.createElement("table");
 
     const legenda = tabela.createCaption();

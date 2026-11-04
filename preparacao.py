@@ -49,7 +49,108 @@ DEFAULTS_UTE = {
 }
 
 
-def montar_sistema(hidreletricas, termeletricas):
+def _numero_deck(valor, campo):
+    """Converte um valor textual do deck e rejeita campos vazios."""
+
+    texto = str(valor).strip()
+    if not texto:
+        raise ValueError(f"{campo} vazio no deck.")
+
+    return _numero(texto.replace("D", "E").replace("d", "e"), campo)
+
+
+def _linhas_por_codigo(tabela, coluna, codigo):
+    """Seleciona linhas de uma tabela PySDDP pelo código da usina."""
+
+    if tabela is None or coluna not in tabela.columns:
+        return []
+
+    return [
+        registro
+        for registro in tabela.to_dict(orient="records")
+        if str(registro[coluna]).strip() == str(codigo).strip()
+    ]
+
+
+def _parametros_ute_do_deck(caso, codigo):
+    """Lê e agrega os parâmetros da UTE selecionada nos arquivos do deck."""
+
+    if caso is None:
+        return {}
+
+    cadastro = getattr(caso, "cadterm", None)
+    operacao = getattr(caso, "operut", None)
+    unidades = _linhas_por_codigo(
+        getattr(cadastro, "cadunidt_df", None),
+        "num_usi",
+        codigo,
+    )
+    iniciais = _linhas_por_codigo(
+        getattr(operacao, "condicoes_iniciais_df", None),
+        "us",
+        codigo,
+    )
+    operacionais = _linhas_por_codigo(
+        getattr(operacao, "limites_condicoes_df", None),
+        "us",
+        codigo,
+    )
+
+    parametros = {}
+
+    def soma(linhas, coluna, campo):
+        valores = [
+            _numero_deck(linha[coluna], campo)
+            for linha in linhas
+            if coluna in linha and str(linha[coluna]).strip()
+        ]
+        if valores:
+            parametros[campo] = sum(valores)
+
+    def maximo(linhas, coluna, campo):
+        valores = [
+            _numero_deck(linha[coluna], campo)
+            for linha in linhas
+            if coluna in linha and str(linha[coluna]).strip()
+        ]
+        if valores:
+            parametros[campo] = max(valores)
+
+    # CADUNIDT: uma usina pode possuir mais de uma unidade geradora.
+    soma(unidades, "pot", "Cap")
+    soma(unidades, "ger_min", "Pmin")
+    maximo(unidades, "temp_on", "Ton_h")
+    maximo(unidades, "temp_off", "Toff_h")
+    soma(unidades, "ramp_tom", "Rup")
+    soma(unidades, "ramp_alivio", "Rdown")
+
+    # INIT: geração inicial é agregada; status e tempo representam a usina.
+    if iniciais:
+        parametros["Status_inicial"] = int(
+            _numero_deck(iniciais[0]["st"], "Status_inicial")
+        )
+        parametros["Geracao_inicial"] = sum(
+            _numero_deck(linha["GerInic"], "Geracao_inicial")
+            for linha in iniciais
+        )
+        parametros["Tempo_status_inicial_h"] = _numero_deck(
+            iniciais[0]["tempo"],
+            "Tempo_status_inicial_h",
+        )
+
+    # OPER: usa o primeiro custo informado para a usina selecionada.
+    for linha in operacionais:
+        if str(linha.get("Custo", "")).strip():
+            parametros["Custo"] = _numero_deck(
+                linha["Custo"],
+                "Custo",
+            )
+            break
+
+    return parametros
+
+
+def montar_sistema(hidreletricas, termeletricas, caso=None):
     """Recebe as usinas SELECIONADAS e retorna apenas Geral, UHE e UTE."""
     geral = deepcopy(DEFAULTS_GERAL)
     geral["Nr_Est"] = len(geral["Duracao_h"])
@@ -73,10 +174,27 @@ def montar_sistema(hidreletricas, termeletricas):
             "Afl": [DEFAULTS_UHE["Afluencia_m3s"]] * n_periodos,
         })
 
-    lista_ute = [
-        {"Nome": dados["nome"], **deepcopy(DEFAULTS_UTE)}
-        for dados in termeletricas
-    ]
+    lista_ute = []
+    for dados in termeletricas:
+        parametros = deepcopy(DEFAULTS_UTE)
+        parametros.update(
+            _parametros_ute_do_deck(
+                caso,
+                dados["codigo"],
+            )
+        )
+
+        # Mantém as trajetórias default compatíveis com os limites reais.
+        parametros["Traj_partida"] = [
+            (0.5, parametros["Pmin"]),
+            (1.0, parametros["Pmin"]),
+        ]
+        parametros["Traj_parada"] = [
+            (0.5, parametros["Pmin"]),
+            (1.0, 0.0),
+        ]
+
+        lista_ute.append({"Nome": dados["nome"], **parametros})
 
     sistema = {"Geral": geral, "UHE": lista_uhe, "UTE": lista_ute}
     validar_sistema(sistema)

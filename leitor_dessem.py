@@ -2,6 +2,8 @@
 
 """Primeira etapa: abrir o deck e consultar o cadastro hidráulico."""
 
+import math
+import math
 from pathlib import Path
 import unicodedata
 from PySDDP.Pde import Dessem
@@ -372,6 +374,68 @@ def listar_submercados(caso, incluir_ficticios=False):
         key=lambda submercado: submercado["codigo"],
     )
 
+
+def listar_demandas(caso, codigo_submercado):
+    """Retorna todos os registros DP do submercado informado em uma lista."""
+
+    dados = getattr(caso, "dadger", None)
+    bloco = getattr(dados, "bloco_dp", None)
+    tabela = bloco.get("df") if isinstance(bloco, dict) else None
+
+    if tabela is None or tabela.empty:
+        raise ValueError(
+            "A tabela DP do ENTDADOS não está disponível ou está vazia. "
+            "Confira a leitura."
+        )
+
+    colunas = ["ss", "demanda"]
+    if not set(colunas).issubset(tabela.columns):
+        raise ValueError(
+            f"Colunas esperadas em DP: {colunas}. "
+            f"Encontradas: {list(tabela.columns)}"
+        )
+
+    try:
+        codigo = int(str(codigo_submercado).strip())
+    except (TypeError, ValueError) as erro:
+        raise ValueError(
+            f"Código de submercado inválido: {codigo_submercado!r}"
+        ) from erro
+
+    demandas = []
+
+    for posicao, registro in enumerate(
+        tabela[colunas].itertuples(index=False, name=None),
+        1,
+    ):
+        ss, demanda = registro
+
+        try:
+            if int(str(ss).strip()) != codigo:
+                continue
+
+            valor_mw = float(
+                str(demanda).strip().replace("D", "E").replace("d", "e")
+            )
+        except (TypeError, ValueError, OverflowError) as erro:
+            raise ValueError(
+                f"Registro DP {posicao} inválido: {registro!r}"
+            ) from erro
+
+        if not math.isfinite(valor_mw) or valor_mw < 0:
+            raise ValueError(
+                f"Registro DP {posicao}: demanda inválida: {demanda!r}"
+            )
+
+        demandas.append(valor_mw)
+
+    if not demandas:
+        raise ValueError(
+            f"Nenhuma demanda encontrada para o submercado {codigo}."
+        )
+
+    return demandas
+
 def listar_catalogos(caso, fonte_termicas="termdat"):
     """Consulta as três listas usando o mesmo deck carregado."""
 
@@ -385,6 +449,124 @@ def listar_catalogos(caso, fonte_termicas="termdat"):
 
         "submercados": listar_submercados(caso),
     }
+
+def ler_discretizacao_temporal(caso):
+    """Organiza os TM já lidos pelo PySDDP, sem consultar a demanda DP.
+
+    Os dias mantêm a ordem cronológica do arquivo, inclusive na virada de
+    mês (por exemplo, 30, 31, 1). Os índices dos períodos começam em zero.
+    Um período TM não pode atravessar a meia-noite nesta implementação.
+    """
+    dados = getattr(caso, "dadger", None)
+    bloco = getattr(dados, "bloco_tm", None)
+    tabela = bloco.get("df") if isinstance(bloco, dict) else None
+
+    if tabela is None or tabela.empty:
+        raise ValueError(
+            "O bloco TM do ENTDADOS está ausente ou vazio. Confira a leitura."
+        )
+
+    colunas = ["dd", "hr", "mh", "durac"]
+    if not set(colunas).issubset(tabela.columns):
+        raise ValueError(
+            f"Colunas esperadas em TM: {colunas}. "
+            f"Encontradas: {list(tabela.columns)}"
+        )
+
+    def numero(valor, campo, padrao=None):
+        texto = str(valor).strip()
+        if not texto and padrao is not None:
+            return padrao
+        try:
+            n = float(texto.replace("D", "E").replace("d", "e"))
+        except (ValueError, TypeError) as erro:
+            raise ValueError(f"Campo TM {campo} inválido: {valor!r}") from erro
+        if not math.isfinite(n):
+            raise ValueError(f"Campo TM {campo} não finito: {valor!r}")
+        return n
+
+    dias = {}
+    dia_anterior = None
+    fim_anterior = None
+    numero_periodos = 0
+    duracao_total_h = 0.0
+
+    for posicao, registro in enumerate(tabela.to_dict(orient="records"), 1):
+        try:
+            dia_n = numero(registro["dd"], "dd")
+            hora_n = numero(registro["hr"], "hr", 0)
+            meia_n = numero(registro["mh"], "mh", 0)
+            duracao = numero(registro["durac"], "durac", 1.0)
+
+            if not dia_n.is_integer() or not 1 <= dia_n <= 31:
+                raise ValueError("dia deve ser inteiro entre 1 e 31")
+            if int(hora_n) != hora_n or not 0 <= hora_n <= 23:
+                raise ValueError("hora inicial deve ser inteira entre 0 e 23")
+            if meia_n not in (0, 1):
+                raise ValueError("flag de meia hora deve ser 0 ou 1")
+            if duracao < 0.5 or not math.isclose(
+                duracao * 2, round(duracao * 2), rel_tol=0, abs_tol=1e-8
+            ):
+                raise ValueError("duração deve ser múltipla positiva de 0,5 h")
+
+            dia = int(dia_n)
+            inicio = hora_n + meia_n * 0.5
+            fim = inicio + duracao
+            if fim > 24:
+                raise ValueError(
+                    "período TM atravessa a meia-noite; "
+                    "esse formato exige tratamento adicional"
+                )
+
+            if dia_anterior is not None:
+                if dia == dia_anterior:
+                    if inicio != fim_anterior:
+                        raise ValueError("lacuna, sobreposição ou ordem incorreta")
+                else:
+                    if dia in dias:
+                        raise ValueError("dia reaparece fora da ordem cronológica")
+                    if dia != dia_anterior + 1 and not (
+                        dia == 1 and dia_anterior in (28, 29, 30, 31)
+                    ):
+                        raise ValueError("sequência de dias possui lacuna")
+                    if fim_anterior != 24 or inicio != 0:
+                        raise ValueError("há lacuna entre os períodos de dias consecutivos")
+
+            item_dia = dias.setdefault(dia, {
+                "Dia": dia,
+                "Nr_Est": 0,
+                "Inicio_h": [],
+                "Duracao_h": [],
+                "Intervalos": [],
+            })
+            rede_texto = str(registro.get("rede", "")).strip()
+            rede = None if not rede_texto else numero(rede_texto, "rede")
+            if rede is not None and rede not in (0, 1, 2):
+                raise ValueError("flag de rede deve ser 0, 1 ou 2")
+            item_dia["Inicio_h"].append(float(inicio))
+            item_dia["Duracao_h"].append(float(duracao))
+            item_dia["Intervalos"].append({
+                "Indice": numero_periodos,
+                "Inicio_h": float(inicio),
+                "Fim_h": float(fim),
+                "Duracao_h": float(duracao),
+                "Patamar": str(registro.get("patamar", "")).strip(),
+                "Rede": None if rede is None else int(rede),
+            })
+            item_dia["Nr_Est"] += 1
+            numero_periodos += 1
+            duracao_total_h += duracao
+            dia_anterior, fim_anterior = dia, fim
+        except (ValueError, TypeError, OverflowError) as erro:
+            raise ValueError(f"Registro TM {posicao}: {erro}") from erro
+
+    return {
+        "Nr_Dias": len(dias),
+        "Nr_Est": numero_periodos,
+        "Duracao_total_h": float(duracao_total_h),
+        "Dias": dias,
+    }
+
 
 # Executado somente ao rodar este arquivo diretamente.
 if __name__ == "__main__":
@@ -400,7 +582,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--tipo",
-        choices=["uhe", "ute"],
+        choices=["uhe", "ute","dias"],
         default="uhe",
         help="Tipo de usina: uhe ou ute",
     )
@@ -420,6 +602,25 @@ if __name__ == "__main__":
 
     caso = carregar_deck(argumentos.diretorio)
 
+    if argumentos.tipo == "dias":
+        if argumentos.nome is not None or argumentos.codigo is not None:
+            parser.error(
+                "--nome e --codigo não se aplicam à consulta de dias."
+            )
+
+        temporal = ler_discretizacao_temporal(caso)
+
+        print(
+            json.dumps(
+                temporal,
+                ensure_ascii=False,
+                indent=2,
+                allow_nan=False,
+            )
+        )
+
+        raise SystemExit(0)
+    
     # Escolhe qual catálogo consultar.
     if argumentos.tipo == "ute":
         usinas = listar_termeletricas(
