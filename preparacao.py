@@ -150,9 +150,12 @@ def _parametros_ute_do_deck(caso, codigo):
     return parametros
 
 
-def montar_sistema(hidreletricas, termeletricas, caso=None):
+def montar_sistema(hidreletricas, termeletricas, caso=None, carga=None):
     """Recebe as usinas SELECIONADAS e retorna apenas Geral, UHE e UTE."""
     geral = deepcopy(DEFAULTS_GERAL)
+    if carga is not None:
+        geral["Carga"] = [float(valor) for valor in carga]
+        geral["Duracao_h"] = [0.5] * len(geral["Carga"])
     geral["Nr_Est"] = len(geral["Duracao_h"])
     n_periodos = geral["Nr_Est"]
 
@@ -193,6 +196,8 @@ def montar_sistema(hidreletricas, termeletricas, caso=None):
             (0.5, parametros["Pmin"]),
             (1.0, 0.0),
         ]
+        parametros["TrUp"] = [potencia for _, potencia in parametros["Traj_partida"]]
+        parametros["TrDn"] = [potencia for _, potencia in parametros["Traj_parada"]]
 
         lista_ute.append({"Nome": dados["nome"], **parametros})
 

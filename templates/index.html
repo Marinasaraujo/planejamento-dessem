@@ -14,6 +14,9 @@
     href="{{ url_for('static', filename='style.css') }}"
   >
 
+  <!-- Plotly fornece zoom, legenda e tooltips por ponto. -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
   <!-- Link com o javascript -->
   <!-- script src="../static/app.js" defer></script -->
   <script
@@ -56,7 +59,7 @@
         </p>
 
         <p>
-          <code>DS_CCEE_102026_SEMREDE_RV4D29</code>
+          <code>DS_CCEE_102026_SEMREDE_RV4D24</code>
         </p>
 
         <p>
@@ -176,6 +179,26 @@
           </option>
         </select>
 
+        <label for="multiplicador-carga">
+          Multiplicador da carga
+        </label>
+
+        <input
+          type="number"
+          id="multiplicador-carga"
+          name="multiplicador_carga"
+          value="1"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          aria-describedby="ajuda-multiplicador-carga"
+          disabled
+        >
+
+        <p id="ajuda-multiplicador-carga">
+          O valor será aplicado a todos os períodos da carga antes de gerar o dicionário sistema.
+        </p>
+
         <p id="ajuda-carga">
           A carga será apresentada em MW, nos períodos do deck
           e com suas respectivas durações.
@@ -242,6 +265,10 @@
           disabled
         >
           Preparar dados selecionados
+        </button>
+
+        <button type="button" id="botao-otimizar-caso" disabled>
+          Executar otimização
         </button>
       </p>
     </form>
@@ -351,6 +378,18 @@
         <summary>Ver origem dos dados e defaults utilizados</summary>
         <pre id="json-origens"><code>Nenhum dado preparado.</code></pre>
       </details>
+
+      <section id="resultados-otimizacao" hidden aria-labelledby="titulo-otimizacao">
+        <h3 id="titulo-otimizacao">Resultados da otimização</h3>
+        <div id="metricas-otimizacao" class="metricas-otimizacao"></div>
+        <div class="grade-graficos">
+          <div class="grafico-painel"><h4>Volumes das UHEs</h4><div id="grafico-volumes"></div></div>
+          <div class="grafico-painel"><h4>Geração das UTEs</h4><div id="grafico-geracao-termica"></div></div>
+          <div class="grafico-painel"><h4>Operação ligar/desligar</h4><div id="grafico-operacao-termica"></div></div>
+          <div class="grafico-painel"><h4>Duração dos estados térmicos</h4><div id="grafico-duracao-termica"></div></div>
+          <div class="grafico-painel"><h4>Curva de carga e déficit</h4><div id="grafico-carga"></div></div>
+        </div>
+      </section>
     </section>
   </main>
 

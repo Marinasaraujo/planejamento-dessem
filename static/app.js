@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
     diretorio: elemento("diretorio-deck"),
     carregar: elemento("botao-carregar-deck"),
     preparar: elemento("botao-preparar-caso"),
+    otimizar: elemento("botao-otimizar-caso"),
 
     uhe: elemento("usinas-hidreletricas"),
     ute: elemento("usinas-termeletricas"),
@@ -27,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     limparUhe: elemento("limpar-uhe"),
     limparUte: elemento("limpar-ute"),
     submercado: elemento("submercado"),
+    multiplicadorCarga: elemento("multiplicador-carga"),
 
     fonte: elemento("fonte-afluencias"),
     ano: elemento("ano-afluencias"),
@@ -40,7 +42,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     carga: elemento("dados-carga"),
     afluencias: elemento("dados-afluencias"),
-    json: elemento("json-caso")
+    json: elemento("json-caso"),
+    resultadosOtimizacao: elemento("resultados-otimizacao"),
+    metricasOtimizacao: elemento("metricas-otimizacao"),
+    graficoVolumes: elemento("grafico-volumes"),
+    graficoGeracaoTermica: elemento("grafico-geracao-termica"),
+    graficoOperacaoTermica: elemento("grafico-operacao-termica"),
+    graficoDuracaoTermica: elemento("grafico-duracao-termica"),
+    graficoCarga: elemento("grafico-carga")
   };
 
   // 2. Estado da aplicação nesta página.
@@ -154,6 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tela.uhe,
       tela.ute,
       tela.submercado,
+      tela.multiplicadorCarga,
       tela.fonte
     ]) {
       campo.disabled = estado.ocupado || semDeck;
@@ -174,6 +184,8 @@ document.addEventListener("DOMContentLoaded", () => {
       tela.fonte.value !== "ano_historico";
 
     tela.preparar.disabled = estado.ocupado || semDeck;
+    tela.otimizar.disabled = estado.ocupado || semDeck ||
+      tela.resultadosOtimizacao.dataset.preparado !== "true";
 
     tela.formulario.setAttribute(
       "aria-busy",
@@ -290,6 +302,30 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function mostrarSerie(destino, linhas, colunas, descricao) {
+    if (destino === tela.carga || destino === tela.afluencias) {
+      if (destino === tela.carga) {
+        criarGrafico(
+          destino,
+          [{ nome: "Carga (MW)", valores: linhas }],
+          descricao
+        );
+        return;
+      }
+
+      const porUsina = new Map();
+      for (const registro of linhas) {
+        const codigo = String(registro.codigo_usina ?? "Afluência");
+        if (!porUsina.has(codigo)) porUsina.set(codigo, []);
+        porUsina.get(codigo).push(Number(registro.vazao_m3s));
+      }
+      criarGrafico(
+        destino,
+        [...porUsina.entries()].map(([nome, valores]) => ({ nome, valores })),
+        descricao
+      );
+      return;
+    }
+
     destino.replaceChildren();
 
     if (
@@ -350,6 +386,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tela.json.textContent =
       "Nenhum dado preparado.";
+
+    tela.resultadosOtimizacao.hidden = true;
+    tela.resultadosOtimizacao.dataset.preparado = "false";
+    tela.metricasOtimizacao.replaceChildren();
+    for (const grafico of [
+      tela.graficoVolumes,
+      tela.graficoGeracaoTermica,
+      tela.graficoOperacaoTermica,
+      tela.graficoDuracaoTermica,
+      tela.graficoCarga
+    ]) {
+      grafico.replaceChildren();
+    }
 
     tela.statusSelecao.textContent =
       "Seleção atual ainda não preparada.";
@@ -573,6 +622,7 @@ document.addEventListener("DOMContentLoaded", () => {
         codigos_ute: selecionados(tela.ute),
 
         codigo_submercado: tela.submercado.value,
+        multiplicador_carga: Number(tela.multiplicadorCarga.value),
         fonte_afluencias: tela.fonte.value,
 
         ano_afluencias: tela.fonte.value === "ano_historico"
@@ -641,8 +691,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       tela.statusSelecao.textContent =
         "Dados recebidos do Python. " +
-        "Nenhuma otimização executada." +
+        "Dados prontos para otimização." +
         pendencias;
+      tela.resultadosOtimizacao.dataset.preparado = "true";
+      atualizarControles();
 
     } catch (erro) {
       limparResultados();
@@ -655,6 +707,101 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 8. Associa os eventos da página às funções.
+  function criarGrafico(destino, series, rotulo) {
+    if (typeof Plotly === "undefined") {
+      destino.textContent = "Não foi possível carregar o Plotly.";
+      return;
+    }
+
+    Plotly.purge(destino);
+    destino.replaceChildren();
+    if (series.length === 0) {
+      destino.textContent = "Sem dados para exibir.";
+      return;
+    }
+
+    const traces = series.map((serie) => ({
+      x: serie.valores.map((_, indice) => indice + 1),
+      y: serie.valores,
+      name: serie.nome,
+      type: "scatter",
+      mode: "lines+markers",
+      hovertemplate: `${serie.nome}<br>Intervalo: %{x}<br>Valor: %{y:.3f}<extra></extra>`
+    }));
+
+    Plotly.newPlot(destino, traces, {
+      title: { text: rotulo, font: { size: 14 } },
+      height: 350,
+      margin: { l: 52, r: 20, t: 42, b: 72 },
+      hovermode: "closest",
+      hoverlabel: { bgcolor: "#172536", font: { color: "#ffffff" } },
+      paper_bgcolor: "transparent",
+      plot_bgcolor: "#fbfdff",
+      xaxis: { title: "Intervalo", dtick: 1 },
+      yaxis: { title: "Valor" },
+      legend: { orientation: "h", y: -0.2 },
+      showlegend: true
+    }, {
+      responsive: true,
+      displaylogo: false,
+      modeBarButtonsToRemove: ["lasso2d", "select2d"]
+    });
+  }
+
+  function mostrarResultados(resultado) {
+    const geral = resultado.Geral;
+    const numero = (valor) => Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+    tela.metricasOtimizacao.innerHTML =
+      `<span><strong>Custo total</strong>${numero(geral.CustoTotal)}</span>` +
+      `<span><strong>Custo futuro</strong>${numero(geral.CustoFuturo)}</span>` +
+      `<span><strong>Intervalos</strong>${geral.Duracao_h.length}</span>`;
+    criarGrafico(tela.graficoVolumes, resultado.UHE.flatMap((uhe) => [
+      { nome: `${uhe.Nome} — vf`, valores: uhe.vf },
+      { nome: `${uhe.Nome} — vt`, valores: uhe.vt },
+      { nome: `${uhe.Nome} — vv`, valores: uhe.vv }
+    ]), "Volumes");
+    criarGrafico(tela.graficoGeracaoTermica, resultado.UTE.map((ute) => ({ nome: ute.Nome, valores: ute.gt })), "Geração térmica");
+    criarGrafico(tela.graficoOperacaoTermica, resultado.UTE.flatMap((ute) => [
+      { nome: `${ute.Nome} — ligado`, valores: ute.ut },
+      { nome: `${ute.Nome} — partida`, valores: ute.yt },
+      { nome: `${ute.Nome} — parada`, valores: ute.wt }
+    ]), "Operação térmica");
+    criarGrafico(tela.graficoDuracaoTermica, resultado.UTE.map((ute) => {
+      let duracao = 0;
+      return {
+        nome: ute.Nome,
+        valores: ute.ut.map((estado, indice) => {
+          duracao = indice === 0 || estado !== ute.ut[indice - 1]
+            ? geral.Duracao_h[indice]
+            : duracao + geral.Duracao_h[indice];
+          return duracao;
+        })
+      };
+    }), "Duração do estado (h)");
+    criarGrafico(tela.graficoCarga, [
+      { nome: "Carga", valores: geral.Carga },
+      { nome: "Déficit", valores: geral.Deficit }
+    ], "Carga e déficit");
+    tela.resultadosOtimizacao.hidden = false;
+  }
+
+  async function otimizarCaso() {
+    if (estado.ocupado || estado.deckId === null || tela.resultadosOtimizacao.dataset.preparado !== "true") return;
+    estado.ocupado = true;
+    atualizarControles();
+    tela.statusSelecao.textContent = "Executando otimização…";
+    try {
+      const resposta = await enviarJson("/api/caso/otimizar", { deck_id: estado.deckId });
+      mostrarResultados(resposta.resultado);
+      tela.statusSelecao.textContent = "Otimização concluída. Resultados exibidos ao lado.";
+    } catch (erro) {
+      tela.statusSelecao.textContent = erro.message;
+    } finally {
+      estado.ocupado = false;
+      atualizarControles();
+    }
+  }
+
   tela.formulario.addEventListener("submit", (evento) => {
     evento.preventDefault();
   });
@@ -669,6 +816,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tela.uhe,
     tela.ute,
     tela.submercado,
+    tela.multiplicadorCarga,
     tela.fonte,
     tela.ano
   ]) {
@@ -680,6 +828,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   tela.carregar.addEventListener("click", carregarDeck);
   tela.preparar.addEventListener("click", prepararCaso);
+  tela.otimizar.addEventListener("click", otimizarCaso);
 
   tela.buscaUhe.addEventListener("input", () => aplicarBusca("uhe"));
   tela.buscaUte.addEventListener("input", () => aplicarBusca("ute"));
@@ -687,6 +836,18 @@ document.addEventListener("DOMContentLoaded", () => {
   tela.limparUte.addEventListener("click", () => limparSelecao("ute"));
   tela.uhe.addEventListener("change", () => aplicarBusca("uhe"));
   tela.ute.addEventListener("change", () => aplicarBusca("ute"));
+
+  // Permite selecionar varias usinas com cliques independentes, sem Ctrl/Cmd.
+  for (const select of [tela.uhe, tela.ute]) {
+    select.addEventListener("mousedown", (evento) => {
+      const opcao = evento.target.closest("option");
+      if (!opcao || opcao.disabled) return;
+
+      evento.preventDefault();
+      opcao.selected = !opcao.selected;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
 
   // Configuração inicial da interface.
   invalidarDeck();

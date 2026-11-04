@@ -3,6 +3,7 @@
 """Dashboard local para carregar um deck e conferir sua seleção."""
 
 from pathlib import Path
+import math
 from secrets import token_hex
 from uuid import uuid4
 
@@ -31,7 +32,7 @@ app.json.ensure_ascii = False
 
 # Considera que a pasta do deck está ao lado deste app.py.
 app.config["DECK_PADRAO"] = (
-    BASE_DIR / "DS_CCEE_102026_SEMREDE_RV4D29"
+    BASE_DIR / "DS_CCEE_102026_SEMREDE_RV4D24"
 )
 
 # Memória do processo: o deck é lido uma vez e reutilizado nas consultas.
@@ -249,10 +250,19 @@ def api_consultar_selecao():
     )[0]
 
     try:
+        multiplicador_carga = float(dados.get("multiplicador_carga", 1))
+    except (TypeError, ValueError, OverflowError) as erro:
+        abort(400, description="O multiplicador da carga deve ser numérico.")
+
+    if not math.isfinite(multiplicador_carga) or multiplicador_carga < 0:
+        abort(400, description="O multiplicador da carga deve ser finito e não negativo.")
+
+    try:
         carga = listar_demandas(
             deck["caso"],
             submercado["codigo"],
         )
+        carga = [valor * multiplicador_carga for valor in carga]
     except (ValueError, KeyError, TypeError) as erro:
         return jsonify(
             erro=f"Não foi possível consultar a carga: {erro}"
@@ -262,7 +272,12 @@ def api_consultar_selecao():
         abort(400, description="A base histórica de afluências ainda não foi conectada.")
 
     try:
-        sistema = montar_sistema(uhe, ute, caso=deck["caso"])
+        sistema = montar_sistema(
+            uhe,
+            ute,
+            caso=deck["caso"],
+            carga=carga,
+        )
     except (ValueError, KeyError, TypeError) as erro:
         return jsonify(erro=f"Não foi possível montar o sistema: {erro}"), 400
 
@@ -271,6 +286,8 @@ def api_consultar_selecao():
         pendencias.append("VI calculado a 50% do volume útil; Prod, Engol e Afl defaults. Cascata ainda não tratada.")
     if ute:
         pendencias.append("Um gerador equivalente por UTE, com parâmetros térmicos defaults.")
+
+    deck["sistema"] = sistema
 
     return jsonify(
         etapa="preparacao_com_defaults",
@@ -290,6 +307,7 @@ def api_consultar_selecao():
             "codigos_uhe": [u["codigo"] for u in uhe],
             "codigos_ute": [u["codigo"] for u in ute],
             "codigo_submercado": submercado["codigo"],
+            "multiplicador_carga": multiplicador_carga,
             "fonte_afluencias_solicitada": "deck",
         },
         uhe=[{**dados, "volume_inicial_hm3":modelo["VI"], "origem_volume_inicial":"default"}
@@ -302,6 +320,48 @@ def api_consultar_selecao():
 
         pendencias=pendencias,
     )
+
+
+@app.post("/api/caso/otimizar")
+def api_otimizar_caso():
+    """Executa o despacho MILP do sistema preparado na sessão."""
+
+    dados = receber_json()
+    deck_id = dados.get("deck_id")
+    if not isinstance(deck_id, str) or deck_id != session.get("deck_id"):
+        abort(409, description="Carregue e prepare o deck novamente nesta sessão.")
+
+    deck = decks.get(deck_id)
+    sistema = deck.get("sistema") if deck is not None else None
+    if sistema is None:
+        abort(409, description="Prepare os dados antes de executar a otimização.")
+
+    try:
+        from otimizador import despacho_milp
+
+        resultado = despacho_milp(
+            sistema,
+            [uhe["VI"] for uhe in sistema["UHE"]],
+            [uhe["Afl"] for uhe in sistema["UHE"]],
+            cortes=[],
+            iest=0,
+        )
+    except ImportError as erro:
+        app.logger.exception("Dependência do otimizador indisponível")
+        return jsonify(
+            erro="O otimizador requer a dependência PySCIPOpt instalada no ambiente Python.",
+            detalhe=str(erro),
+        ), 503
+    except (ValueError, RuntimeError, KeyError, TypeError) as erro:
+        app.logger.exception("Falha na otimização")
+        return jsonify(erro=f"Não foi possível executar a otimização: {erro}"), 400
+
+    for dados_ute, resultado_ute in zip(sistema["UTE"], resultado["UTE"]):
+        resultado_ute["Nome"] = dados_ute["Nome"]
+    for dados_uhe, resultado_uhe in zip(sistema["UHE"], resultado["UHE"]):
+        resultado_uhe["Nome"] = dados_uhe["Nome"]
+
+    return jsonify(etapa="otimizacao_concluida", resultado=resultado)
 
 
 # 6. Devolve erros das rotas da API em JSON.
