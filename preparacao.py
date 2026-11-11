@@ -26,9 +26,9 @@ DEFAULTS_GERAL = {
 
 DEFAULTS_UHE = {
     "Fracao_volume_util_inicial": 0.5,
-    "Prod": 0.95,
-    "Engol": 60.0,
-    "Afluencia_m3s": 23.0,
+    "Prod": 0.26,
+    "Engol": 317.9,
+    "Afluencia_hm3s": 0.13,
 }
 
 # Um único padrão para todas as UTEs; não atribuímos GT_1/GT_2 pela ordem.
@@ -174,7 +174,7 @@ def montar_sistema(hidreletricas, termeletricas, caso=None, carga=None):
             "Vmin": vmin,
             "Prod": DEFAULTS_UHE["Prod"],
             "Engol": DEFAULTS_UHE["Engol"],
-            "Afl": [DEFAULTS_UHE["Afluencia_m3s"]] * n_periodos,
+            "Afl": [DEFAULTS_UHE["Afluencia_hm3s"]] * n_periodos,
         })
 
     lista_ute = []

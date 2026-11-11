@@ -376,7 +376,14 @@ def listar_submercados(caso, incluir_ficticios=False):
 
 
 def listar_demandas(caso, codigo_submercado):
-    """Retorna todos os registros DP do submercado informado em uma lista."""
+    """Retorna a carga expandida em intervalos de 30 minutos.
+
+    O primeiro dia normalmente já possui 48 registros DP. Nos dias seguintes,
+    o DP informa apenas os patamares que mudam; a discretização TM informa a
+    duração de cada patamar. Cada duração é, portanto, replicada em passos de
+    meia hora para que a série final tenha a mesma granularidade em todos os
+    dias.
+    """
 
     dados = getattr(caso, "dadger", None)
     bloco = getattr(dados, "bloco_dp", None)
@@ -388,7 +395,7 @@ def listar_demandas(caso, codigo_submercado):
             "Confira a leitura."
         )
 
-    colunas = ["ss", "demanda"]
+    colunas = ["ss", "di", "hi", "mi", "demanda"]
     if not set(colunas).issubset(tabela.columns):
         raise ValueError(
             f"Colunas esperadas em DP: {colunas}. "
@@ -402,17 +409,23 @@ def listar_demandas(caso, codigo_submercado):
             f"Código de submercado inválido: {codigo_submercado!r}"
         ) from erro
 
-    demandas = []
+    demandas = {}
 
     for posicao, registro in enumerate(
         tabela[colunas].itertuples(index=False, name=None),
         1,
     ):
-        ss, demanda = registro
+        ss, dia, hora, meia_hora, demanda = registro
 
         try:
             if int(str(ss).strip()) != codigo:
                 continue
+
+            chave = (
+                int(str(dia).strip()),
+                int(str(hora).strip()),
+                int(str(meia_hora).strip()),
+            )
 
             valor_mw = float(
                 str(demanda).strip().replace("D", "E").replace("d", "e")
@@ -427,14 +440,37 @@ def listar_demandas(caso, codigo_submercado):
                 f"Registro DP {posicao}: demanda inválida: {demanda!r}"
             )
 
-        demandas.append(valor_mw)
+        if chave in demandas:
+            raise ValueError(
+                f"Registro DP {posicao}: início duplicado para {chave}."
+            )
+        demandas[chave] = valor_mw
 
     if not demandas:
         raise ValueError(
             f"Nenhuma demanda encontrada para o submercado {codigo}."
         )
 
-    return demandas
+    temporal = ler_discretizacao_temporal(caso)
+    carga = []
+
+    for dia, dados_dia in temporal["Dias"].items():
+        for intervalo in dados_dia["Intervalos"]:
+            inicio_h = intervalo["Inicio_h"]
+            hora = int(inicio_h)
+            meia_hora = int(round((inicio_h - hora) * 2))
+            chave = (dia, hora, meia_hora)
+
+            if chave not in demandas:
+                raise ValueError(
+                    "Não foi encontrada demanda DP para o início "
+                    f"do intervalo {chave}."
+                )
+
+            repeticoes = int(round(intervalo["Duracao_h"] * 2))
+            carga.extend([demandas[chave]] * repeticoes)
+
+    return carga
 
 def listar_catalogos(caso, fonte_termicas="termdat"):
     """Consulta as três listas usando o mesmo deck carregado."""
