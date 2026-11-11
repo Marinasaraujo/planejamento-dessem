@@ -47,7 +47,7 @@ DEFAULTS_UTE = {
     "Geracao_inicial": 8.0,
     "Traj_partida": [(0.5, 2.5), (1.0, 5.0)],
     "Traj_parada": [(0.5, 2.5), (1.0, 0.0)],
-    "Trajetoria_inicial": None,
+    "Trajetoria_inicial": None,  # se ela começou ligando ou desligando
 }
 
 
@@ -275,32 +275,6 @@ def montar_sistema(
     validar_sistema(sistema)
     return sistema
 
-
-def origens_dados():
-    """Mantém a rastreabilidade fora do dicionário exigido pelo modelo."""
-    return {
-        "Geral": {
-            "Custo_def": "ENTDADOS, registro CD (CUSTO DE DEFICIT), em R$/MWh.",
-            "Carga": "Default: perfil fictício de 24 horas repetido em meias horas; não é a carga do submercado.",
-            "Duracao_h": "Default: 48 intervalos de 0,5 h; ainda não extraído de TM.",
-            "Nr_Est": "Calculado como len(Duracao_h).",
-        },
-        "UHE": {
-            "Nome": "HIDR: nome cadastral.",
-            "Vmin": "HIDR: vol_min, em hm³; sem aplicar alterações de AC/restrições operativas.",
-            "Vmax": "HIDR: vol_max, em hm³; sem aplicar alterações de AC/restrições operativas.",
-            "VI": f"Default calculado: Vmin + {DEFAULTS_UHE['Fracao_volume_util_inicial']} × (Vmax − Vmin); não é o volume inicial do deck.",
-            "Prod": "Valor informado pelo usuário ou default constante em MW/hm³.",
-            "Engol": "Valor informado pelo usuário ou default em hm³ por intervalo.",
-            "Afl": "Valor informado pelo usuário ou default constante em hm³ por intervalo.",
-        },
-        "UTE": {
-            "Nome": "Nome do catálogo selecionado (TERMDAT no dashboard atual).",
-            **{campo: "Default; não extraído do cadastro/OPERUT/RAMPAS."
-               for campo in DEFAULTS_UTE},
-            "Representacao": "Um gerador equivalente por usina selecionada; unidades reais ainda não detalhadas.",
-        },
-    }
 
 
 def _numero(valor, campo):

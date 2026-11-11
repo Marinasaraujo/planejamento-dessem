@@ -35,6 +35,8 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
     num_UHE = len(sistema['UHE'])
     num_UTE = len(sistema['UTE'])
 
+    # Lê o horizonte e valida os dados
+
     duracao_h = [float(valor) for valor in sistema['Geral']['Duracao_h']]
     n_periodos = len(duracao_h)
     carga = [float(valor) for valor in sistema['Geral']['Carga']]
@@ -160,7 +162,7 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
     if not imprime:
         modelo.hideOutput()
 
-    ### Variáveis e limites ###
+    # Variáveis e limites 
 
     vf = []
     vt = []
@@ -217,7 +219,7 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
     fob = 0
     for i, ute in enumerate(sistema['UTE']):
         for t in range(n_periodos):
-            # MW * horas = MWh. Não é conversão de vazão ou volume.
+            # Custo considerado em R$/MWh segundo manual 
             fob += float(ute['Custo']) * gt[i][t] * duracao_h[t]
 
     for t in range(n_periodos):
@@ -231,7 +233,7 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
     fob += alpha
     modelo.setObjective(fob, 'minimize')
 
-    ### Balanço hídrico ###
+    # Balanço hídrico 
 
     balanco_hidrico = []
     for i, uhe in enumerate(sistema['UHE']):
@@ -246,13 +248,13 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
             restricoes_uhe.append(restricao)
         balanco_hidrico.append(restricoes_uhe)
 
-    ### Atendimento à demanda ###
+    # Atendimento à demanda 
 
     balanco_energia = []
     for t in range(n_periodos):
         AD = 0
         for i, uhe in enumerate(sistema['UHE']):
-            AD += valor_periodo(uhe['Prod'], t) * vt[i][t]
+            AD += uhe['Prod'] * vt[i][t]
         for i, ute in enumerate(sistema['UTE']):
             AD += gt[i][t]
         AD += deficit[t]
@@ -268,6 +270,7 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
         status_inicial = int(ute['Status_inicial'])
 
         for t in range(n_periodos):
+            # status anterior 
             u_anterior = status_inicial if t == 0 else ut[i][t - 1]
 
             # Equações 10.5 e 10.6.
@@ -395,7 +398,7 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
                 name=f'rampa_descida_{i}_{t}',
             )
 
-    ### Cortes da função de custo futuro ###
+    # Cortes da função de custo futuro
 
     for k, icorte in enumerate(cortes):
         if icorte['Estagio'] == iest:
@@ -405,14 +408,14 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
             equacao += float(icorte['Termo_Indep'])
             modelo.addCons(alpha >= equacao, name=f'corte_{k}')
 
-    ### Resolução ###
+    # Resolução 
 
     modelo.optimize()
     status = modelo.getStatus()
     if status != 'optimal':
         raise RuntimeError(f'Despacho do dia/estágio {iest}: {status}')
 
-    ### Resultados ###
+    # Resultados 
 
     Geral = {
         # Não consulta duais diretamente do MILP.

@@ -694,14 +694,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Mostra o objeto completo, com indentação de dois espaços.
       tela.json.textContent = JSON.stringify(caso, null, 2);
 
-      const pendencias = caso.pendencias?.length
-        ? ` Pendências: ${caso.pendencias.join("; ")}`
-        : "";
-
       tela.statusSelecao.textContent =
-        "Dados recebidos do Python. " +
-        "Dados prontos para otimização." +
-        pendencias;
+        "Dados recebidos do Python e preparados para otimização." 
       tela.resultadosOtimizacao.dataset.preparado = "true";
       atualizarControles();
 

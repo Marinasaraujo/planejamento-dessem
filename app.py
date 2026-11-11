@@ -19,7 +19,7 @@ from flask import (
 from werkzeug.exceptions import HTTPException
 
 from leitor_dessem import carregar_deck, listar_catalogos, listar_demandas
-from preparacao import montar_sistema, origens_dados
+from preparacao import montar_sistema
 
 
 # 1. Configuração da aplicação.
@@ -317,11 +317,7 @@ def api_consultar_selecao():
     except (ValueError, KeyError, TypeError) as erro:
         return jsonify(erro=f"Não foi possível montar o sistema: {erro}"), 400
 
-    pendencias = ["Durações de 0,5 h; custo de déficit lido do registro CD."]
-    if uhe:
-        pendencias.append("VI calculado a 50% do volume útil; Prod, Engol e Afl defaults. Cascata ainda não tratada.")
-    if ute:
-        pendencias.append("Um gerador equivalente por UTE, com parâmetros térmicos defaults.")
+
 
     deck["sistema"] = sistema
 
@@ -332,7 +328,6 @@ def api_consultar_selecao():
         # Ainda não representa as condições operativas reais do deck.
         pronto_para_modelo=False,
         sistema=sistema,
-        origens=origens_dados(),
         metadados={
             "deck": deck["nome"],
             "data_referencia": deck["data_referencia"],
@@ -384,7 +379,6 @@ def api_consultar_selecao():
         carga=carga,
         afluencias=[],
 
-        pendencias=pendencias,
     )
 
 

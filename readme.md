@@ -207,7 +207,6 @@ Esses defaults são placeholders do modelo, não parâmetros operativos extraíd
 ### Rastreabilidade e validação
 
 - Os valores estão centralizados em `CARGA_HORARIA_PADRAO`, `DEFAULTS_GERAL`, `DEFAULTS_UHE` e `DEFAULTS_UTE`, em `preparacao.py`.
-- `origens_dados()` descreve a origem de cada campo separadamente de `sistema`.
 - `deepcopy()` cria listas independentes para evitar que alterações em uma usina afetem outras ou os defaults globais.
 - `validar_sistema()` verifica números finitos, durações positivas, tamanhos das séries, limites de volume, potência mínima/máxima, status/geração inicial e consistência básica das trajetórias.
 - Essas verificações não demonstram viabilidade do despacho nem equivalência com a formulação completa do DESSEM.
@@ -266,7 +265,6 @@ A resposta distingue:
 | Campo | Conteúdo / significado |
 | --- | --- |
 | `sistema` | Dicionário `Geral`/`UHE`/`UTE` para o modelo. |
-| `origens` | Procedência dos campos e descrição dos defaults. |
 | `metadados` | Identificação do deck, data e submercado selecionado. |
 | `selecao` | Códigos escolhidos e fonte de afluências solicitada. |
 | `uhe`, `ute` | Dados da seleção para apresentar nas tabelas. |
@@ -274,7 +272,6 @@ A resposta distingue:
 | `estrutura_validada` | `true` após as verificações de `validar_sistema()`. |
 | `usa_defaults` | `true` na implementação atual. |
 | `pronto_para_modelo` | `false`: ainda falta validar/adaptar os dados operativos reais do deck. Não significa que o dicionário deixou de ser gerado. |
-| `pendencias` | Resumo das simplificações e extrações pendentes. |
 
 Os campos externos `periodos`, `carga` e `afluencias` permanecem vazios porque ainda não representam séries extraídas do deck. As séries **default** utilizadas pelo modelo estão em `sistema["Geral"]` e `sistema["UHE"]`.
 
