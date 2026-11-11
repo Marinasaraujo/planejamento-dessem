@@ -280,15 +280,30 @@ def api_consultar_selecao():
             erro=f"Não foi possível consultar a carga: {erro}"
         ), 400
 
-    afluencia = numero_opcional_nao_negativo(
-        dados, "afluencia", "Afluência"
-    )
-    produtibilidade = numero_opcional_nao_negativo(
-        dados, "produtibilidade", "Produtibilidade"
-    )
-    engolimento = numero_opcional_nao_negativo(
-        dados, "engolimento", "Engolimento"
-    )
+    parametros_uhe = dados.get("parametros_uhe", [])
+    if not isinstance(parametros_uhe, list):
+        abort(400, description="Os parâmetros das UHEs devem ser uma lista.")
+
+    codigos_selecionados = {str(item["codigo"]) for item in uhe}
+    codigos_parametros = set()
+    for item in parametros_uhe:
+        if not isinstance(item, dict) or "codigo" not in item:
+            abort(400, description="Cada UHE deve informar seu código.")
+        codigo = str(item["codigo"])
+        if codigo not in codigos_selecionados:
+            abort(400, description=f"Parâmetros enviados para UHE não selecionada: {codigo}.")
+        if codigo in codigos_parametros:
+            abort(400, description=f"Parâmetros repetidos para a UHE: {codigo}.")
+        codigos_parametros.add(codigo)
+        for campo, rotulo in (
+            ("afluencia", "Afluência"),
+            ("produtibilidade", "Produtibilidade"),
+            ("engolimento", "Engolimento"),
+        ):
+            numero_opcional_nao_negativo(item, campo, f"{rotulo} da UHE {codigo}")
+    if codigos_parametros != codigos_selecionados:
+        faltantes = ", ".join(sorted(codigos_selecionados - codigos_parametros))
+        abort(400, description=f"Faltam parâmetros para as UHEs selecionadas: {faltantes}.")
 
     try:
         sistema = montar_sistema(
@@ -297,9 +312,7 @@ def api_consultar_selecao():
             caso=deck["caso"],
             carga=carga,
             codigo_submercado=submercado["codigo"],
-            afluencia=afluencia,
-            produtibilidade=produtibilidade,
-            engolimento=engolimento,
+            parametros_uhe=parametros_uhe,
         )
     except (ValueError, KeyError, TypeError) as erro:
         return jsonify(erro=f"Não foi possível montar o sistema: {erro}"), 400
@@ -331,9 +344,7 @@ def api_consultar_selecao():
             "codigos_ute": [u["codigo"] for u in ute],
             "codigo_submercado": submercado["codigo"],
             "multiplicador_carga": multiplicador_carga,
-            "afluencia": afluencia,
-            "produtibilidade": produtibilidade,
-            "engolimento": engolimento,
+            "parametros_uhe": parametros_uhe,
         },
         uhe=[
             {

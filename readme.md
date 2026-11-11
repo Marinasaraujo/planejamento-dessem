@@ -250,12 +250,16 @@ Exemplo ilustrativo: substitua os códigos pelos retornados no carregamento.
   "codigos_uhe": ["10", "20"],
   "codigos_ute": ["1"],
   "codigo_submercado": "1",
+  "parametros_uhe": [
+    {"codigo": "10", "afluencia": 100, "produtibilidade": 1.2, "engolimento": 80},
+    {"codigo": "20", "afluencia": 150, "produtibilidade": 1.1, "engolimento": 90}
+  ],
   "fonte_afluencias": "deck",
   "ano_afluencias": null
 }
 ```
 
-As usinas são consultadas no catálogo guardado no servidor pelos códigos recebidos. O backend não usa nomes ou limites arbitrários enviados pelo navegador. A API atual aceita apenas `fonte_afluencias: "deck"`; essa é a fonte solicitada para implementação futura, enquanto `Afl` ainda utiliza default.
+As usinas são consultadas no catálogo guardado no servidor pelos códigos recebidos. O backend não usa nomes ou limites arbitrários enviados pelo navegador. `parametros_uhe` deve conter uma entrada para cada UHE selecionada; cada entrada define sua própria afluência, produtibilidade e engolimento. Valores `null` usam os defaults. A API atual aceita apenas `fonte_afluencias: "deck"`; essa é a fonte solicitada para implementação futura, enquanto `Afl` ainda utiliza o valor informado repetido nos intervalos.
 
 A resposta distingue:
 

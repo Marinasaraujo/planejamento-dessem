@@ -29,9 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
     limparUte: elemento("limpar-ute"),
     submercado: elemento("submercado"),
     multiplicadorCarga: elemento("multiplicador-carga"),
-    afluencia: elemento("afluencia"),
-    produtibilidade: elemento("produtibilidade"),
-    engolimento: elemento("engolimento"),
+    parametrosUhe: elemento("parametros-uhe"),
 
     statusApp: elemento("status-aplicacao"),
     statusDeck: elemento("status-deck"),
@@ -134,6 +132,70 @@ document.addEventListener("DOMContentLoaded", () => {
     configurarBusca(select, campo, resumo, botao);
   }
 
+  function renderizarParametrosUhe() {
+    const valores = new Map(
+      [...tela.parametrosUhe.querySelectorAll("[data-campo-uhe]")].map((campo) => [
+        `${campo.dataset.codigo}:${campo.dataset.campoUhe}`,
+        campo.value
+      ])
+    );
+    tela.parametrosUhe.replaceChildren();
+    const escolhidas = estado.catalogos.uhe.filter((item) =>
+      selecionados(tela.uhe).includes(String(item.codigo))
+    );
+    if (escolhidas.length === 0) {
+      const aviso = document.createElement("p");
+      aviso.textContent = "Selecione as UHEs para informar os parâmetros de cada usina.";
+      tela.parametrosUhe.append(aviso);
+      return;
+    }
+    for (const uhe of escolhidas) {
+      const grupo = document.createElement("fieldset");
+      grupo.className = "grupo-parametros-uhe";
+      const legenda = document.createElement("legend");
+      legenda.textContent = `${uhe.nome} — ${uhe.codigo}`;
+      grupo.append(legenda);
+      for (const [campo, rotulo, unidade] of [
+        ["afluencia", "Afluência", "hm³ por intervalo"],
+        ["produtibilidade", "Produtibilidade", "MW/hm³"],
+        ["engolimento", "Engolimento", "hm³ por intervalo"]
+      ]) {
+        const rotuloCampo = document.createElement("label");
+        rotuloCampo.textContent = `${rotulo} (${unidade})`;
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.step = "any";
+        input.placeholder = "Default";
+        input.dataset.codigo = String(uhe.codigo);
+        input.dataset.campoUhe = campo;
+        input.value = valores.get(`${uhe.codigo}:${campo}`) ?? "";
+        input.addEventListener("change", () => {
+          limparResultados();
+          atualizarControles();
+        });
+        grupo.append(rotuloCampo, input);
+      }
+      tela.parametrosUhe.append(grupo);
+    }
+    atualizarControles();
+  }
+
+  function parametrosUhe() {
+    return estado.catalogos.uhe
+      .filter((uhe) => selecionados(tela.uhe).includes(String(uhe.codigo)))
+      .map((uhe) => {
+        const item = { codigo: String(uhe.codigo) };
+        for (const campo of ["afluencia", "produtibilidade", "engolimento"]) {
+          const input = tela.parametrosUhe.querySelector(
+            `[data-codigo="${CSS.escape(String(uhe.codigo))}"][data-campo-uhe="${campo}"]`
+          );
+          item[campo] = input?.value === "" || !input ? null : Number(input.value);
+        }
+        return item;
+      });
+  }
+
   function limparSelecao(tipo) {
     const select = tipo === "uhe" ? tela.uhe : tela.ute;
     for (const opcao of select.options) opcao.selected = false;
@@ -163,10 +225,10 @@ document.addEventListener("DOMContentLoaded", () => {
       tela.ute,
       tela.submercado,
       tela.multiplicadorCarga,
-      tela.afluencia,
-      tela.produtibilidade,
-      tela.engolimento
     ]) {
+      campo.disabled = estado.ocupado || semDeck;
+    }
+    for (const campo of tela.parametrosUhe.querySelectorAll("input")) {
       campo.disabled = estado.ocupado || semDeck;
     }
 
@@ -392,6 +454,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
     limparResultados();
+    renderizarParametrosUhe();
 
     tela.statusDeck.textContent =
       "Nenhum deck carregado para esta configuração.";
@@ -569,15 +632,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         codigo_submercado: tela.submercado.value,
         multiplicador_carga: Number(tela.multiplicadorCarga.value),
-        afluencia: tela.afluencia.value === ""
-          ? null
-          : Number(tela.afluencia.value),
-        produtibilidade: tela.produtibilidade.value === ""
-          ? null
-          : Number(tela.produtibilidade.value),
-        engolimento: tela.engolimento.value === ""
-          ? null
-          : Number(tela.engolimento.value)
+        parametros_uhe: parametrosUhe()
       });
 
       for (const campo of [
@@ -770,10 +825,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tela.uhe,
     tela.ute,
     tela.submercado,
-    tela.multiplicadorCarga,
-    tela.afluencia,
-    tela.produtibilidade,
-    tela.engolimento
+    tela.multiplicadorCarga
   ]) {
     campo.addEventListener("change", () => {
       limparResultados();
@@ -789,7 +841,11 @@ document.addEventListener("DOMContentLoaded", () => {
   tela.buscaUte.addEventListener("input", () => aplicarBusca("ute"));
   tela.limparUhe.addEventListener("click", () => limparSelecao("uhe"));
   tela.limparUte.addEventListener("click", () => limparSelecao("ute"));
-  tela.uhe.addEventListener("change", () => aplicarBusca("uhe"));
+  tela.uhe.addEventListener("change", () => {
+    aplicarBusca("uhe");
+    renderizarParametrosUhe();
+    limparResultados();
+  });
   tela.ute.addEventListener("change", () => aplicarBusca("ute"));
 
   // Permite selecionar varias usinas com cliques independentes, sem Ctrl/Cmd.

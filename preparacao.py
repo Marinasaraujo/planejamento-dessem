@@ -161,6 +161,7 @@ def montar_sistema(
     afluencia=None,
     produtibilidade=None,
     engolimento=None,
+    parametros_uhe=None,
 ):
     """Recebe as usinas SELECIONADAS e retorna apenas Geral, UHE e UTE."""
     geral = deepcopy(DEFAULTS_GERAL)
@@ -195,18 +196,55 @@ def montar_sistema(
     if not 0 <= fracao <= 1:
         raise ValueError("A fração inicial do volume útil deve estar entre 0 e 1.")
 
+    parametros_por_codigo = {}
+    if parametros_uhe is not None:
+        if not isinstance(parametros_uhe, list):
+            raise ValueError("parametros_uhe deve ser uma lista.")
+        for item in parametros_uhe:
+            if not isinstance(item, dict) or "codigo" not in item:
+                raise ValueError("Cada parâmetro de UHE deve informar o código.")
+            codigo = str(item["codigo"])
+            if codigo in parametros_por_codigo:
+                raise ValueError(f"Parâmetros repetidos para a UHE {codigo}.")
+            parametros_por_codigo[codigo] = item
+
     lista_uhe = []
     for dados in hidreletricas:
         vmin = _numero(dados["volume_min_hm3"], f"Vmin de {dados['nome']}")
         vmax = _numero(dados["volume_max_hm3"], f"Vmax de {dados['nome']}")
+        parametros = parametros_por_codigo.get(str(dados["codigo"]), {})
+        valor_afluencia = parametros.get("afluencia")
+        valor_produtibilidade = parametros.get("produtibilidade")
+        valor_engolimento = parametros.get("engolimento")
+        if valor_afluencia is None:
+            valor_afluencia = afluencia
+        if valor_produtibilidade is None:
+            valor_produtibilidade = produtibilidade
+        if valor_engolimento is None:
+            valor_engolimento = engolimento
+        valor_afluencia = (
+            DEFAULTS_UHE["Afluencia_hm3"]
+            if valor_afluencia is None
+            else _nao_negativo(valor_afluencia, f"Afluência de {dados['nome']}")
+        )
+        valor_produtibilidade = (
+            DEFAULTS_UHE["Prod"]
+            if valor_produtibilidade is None
+            else _nao_negativo(valor_produtibilidade, f"Produtibilidade de {dados['nome']}")
+        )
+        valor_engolimento = (
+            DEFAULTS_UHE["Engol"]
+            if valor_engolimento is None
+            else _nao_negativo(valor_engolimento, f"Engolimento de {dados['nome']}")
+        )
         lista_uhe.append({
             "Nome": dados["nome"],
             "VI": vmin + fracao * (vmax - vmin),
             "Vmax": vmax,
             "Vmin": vmin,
-            "Prod": produtibilidade,
-            "Engol": engolimento,
-            "Afl": [afluencia] * n_periodos,
+            "Prod": valor_produtibilidade,
+            "Engol": valor_engolimento,
+            "Afl": [valor_afluencia] * n_periodos,
         })
 
     lista_ute = []

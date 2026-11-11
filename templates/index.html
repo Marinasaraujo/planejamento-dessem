@@ -209,30 +209,13 @@
       <fieldset id="configuracao-afluencias" class="painel">
         <legend>4. Parâmetros hidráulicos</legend>
 
-        <p>
-          <label for="afluencia">Afluência uniforme (hm³ por intervalo)</label>
-          <br>
-          <input id="afluencia" name="afluencia" type="number" min="0" step="any"
-                 placeholder="Default" aria-describedby="ajuda-afluencias" disabled>
-        </p>
-
-        <p>
-          <label for="produtibilidade">Produtibilidade (MW/hm³)</label>
-          <br>
-          <input id="produtibilidade" name="produtibilidade" type="number" min="0" step="any"
-                 placeholder="Default" disabled>
-        </p>
-
-        <p>
-          <label for="engolimento">Engolimento (hm³ por intervalo)</label>
-          <br>
-          <input id="engolimento" name="engolimento" type="number" min="0" step="any"
-                 placeholder="Default" disabled>
-        </p>
+        <div id="parametros-uhe" aria-describedby="ajuda-afluencias">
+          <p>Selecione as UHEs para informar os parâmetros de cada usina.</p>
+        </div>
 
         <p id="ajuda-afluencias">
-          Preencha apenas os valores que deseja sobrescrever. Cada valor
-          informado será aplicado a todos os intervalos das UHEs selecionadas.
+          Preencha os valores de cada UHE. A afluência informada será aplicada
+          a todos os intervalos dessa usina; campos vazios usam o default.
         </p>
       </fieldset>
 
