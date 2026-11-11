@@ -205,56 +205,34 @@
         </p>
       </fieldset>
 
-      <!-- 4. Ano e médias dependem de uma base histórica adicional. -->
+      <!-- 4. Parâmetros hidráulicos opcionais. -->
       <fieldset id="configuracao-afluencias" class="painel">
-        <legend>4. Afluências</legend>
-
-        <label for="fonte-afluencias">
-          Fonte das afluências
-        </label>
-
-        <br>
-
-        <select
-          id="fonte-afluencias"
-          name="fonte_afluencias"
-          aria-describedby="ajuda-afluencias"
-          disabled
-        >
-          <option value="deck" selected>
-            Afluências do deck (DADVAZ)
-          </option>
-
-          <option value="ano_historico" disabled>
-            Ano histórico — requer base histórica
-          </option>
-
-          <option value="media_historica" disabled>
-            Médias históricas — requer base histórica
-          </option>
-        </select>
+        <legend>4. Parâmetros hidráulicos</legend>
 
         <p>
-          <label for="ano-afluencias">
-            Ano histórico
-          </label>
-
+          <label for="afluencia">Afluência uniforme (hm³ por intervalo)</label>
           <br>
+          <input id="afluencia" name="afluencia" type="number" min="0" step="any"
+                 placeholder="Default" aria-describedby="ajuda-afluencias" disabled>
+        </p>
 
-          <select
-            id="ano-afluencias"
-            name="ano_afluencias"
-            disabled
-          >
-            <option value="" selected>
-              Aguardando base histórica
-            </option>
-          </select>
+        <p>
+          <label for="produtibilidade">Produtibilidade (MW/hm³)</label>
+          <br>
+          <input id="produtibilidade" name="produtibilidade" type="number" min="0" step="any"
+                 placeholder="Default" disabled>
+        </p>
+
+        <p>
+          <label for="engolimento">Engolimento (hm³ por intervalo)</label>
+          <br>
+          <input id="engolimento" name="engolimento" type="number" min="0" step="any"
+                 placeholder="Default" disabled>
         </p>
 
         <p id="ajuda-afluencias">
-          Afluências em m³/s. Os anos disponíveis e o período usado nas
-          médias serão informados a partir da base histórica.
+          Preencha apenas os valores que deseja sobrescrever. Cada valor
+          informado será aplicado a todos os intervalos das UHEs selecionadas.
         </p>
       </fieldset>
 
@@ -267,9 +245,6 @@
           Preparar dados selecionados
         </button>
 
-        <button type="button" id="botao-otimizar-caso" disabled>
-          Executar otimização
-        </button>
       </p>
     </form>
 
@@ -304,12 +279,16 @@
               <th scope="col">Volume mínimo (hm³)</th>
               <th scope="col">Volume máximo (hm³)</th>
               <th scope="col">Volume inicial (hm³)</th>
+              <th scope="col">Produtibilidade</th>
+              <th scope="col">Engolimento (hm³)</th>
+              <th scope="col">Afluência (hm³)</th>
+              <th scope="col">Intervalos</th>
             </tr>
           </thead>
 
           <tbody id="corpo-tabela-uhe">
             <tr>
-              <td colspan="5">
+              <td colspan="9">
                 Aguardando seleção e consulta dos dados.
               </td>
             </tr>
@@ -331,13 +310,27 @@
             <tr>
               <th scope="col">Código da usina</th>
               <th scope="col">Nome</th>
-              <th scope="col">Unidade geradora</th>
+              <th scope="col">Capacidade (MW)</th>
+              <th scope="col">Pmín (MW)</th>
+              <th scope="col">Custo</th>
+              <th scope="col">T ligada (h)</th>
+              <th scope="col">T desligada (h)</th>
+              <th scope="col">Rampa subida</th>
+              <th scope="col">Rampa descida</th>
+              <th scope="col">Status inicial</th>
+              <th scope="col">Tempo status (h)</th>
+              <th scope="col">Geração inicial (MW)</th>
+              <th scope="col">Trajetória partida</th>
+              <th scope="col">Trajetória parada</th>
+              <th scope="col">Potências partida</th>
+              <th scope="col">Potências parada</th>
+              <th scope="col">Trajetória inicial</th>
             </tr>
           </thead>
 
           <tbody id="corpo-tabela-ute">
             <tr>
-              <td colspan="3">
+              <td colspan="17">
                 Aguardando seleção e consulta dos dados.
               </td>
             </tr>
@@ -347,7 +340,7 @@
 
       <section aria-labelledby="titulo-series">
         <h3 id="titulo-series">
-          Carga e afluências
+          Perfil de carga
         </h3>
 
         <div id="dados-carga">
@@ -356,12 +349,13 @@
           </p>
         </div>
 
-        <div id="dados-afluencias">
-          <p>
-            As séries de afluência serão exibidas após a consulta.
-          </p>
-        </div>
       </section>
+
+      <p>
+        <button type="button" id="botao-otimizar-caso" disabled>
+          Executar simulação
+        </button>
+      </p>
 
       <details id="estrutura-modelo">
         <summary>

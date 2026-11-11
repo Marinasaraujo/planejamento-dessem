@@ -294,8 +294,7 @@ tbody tr:hover {
   background: #f7fafc;
 }
 
-#dados-carga,
-#dados-afluencias {
+#dados-carga {
   margin-top: 12px;
   min-height: 430px;
   height: 430px;
@@ -307,8 +306,7 @@ tbody tr:hover {
   color: var(--texto-suave);
 }
 
-#dados-carga p,
-#dados-afluencias p {
+#dados-carga p {
   margin: 0;
 }
 
@@ -356,7 +354,6 @@ tbody tr:hover {
 }
 
 #dados-carga .js-plotly-plot,
-#dados-afluencias .js-plotly-plot,
 .grafico-painel > div {
   width: 100%;
   height: 350px;

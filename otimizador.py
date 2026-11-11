@@ -6,10 +6,9 @@ Entradas e unidades (nenhuma conversão é feita):
 - sistema['Geral']['Duracao_h']: horas de cada intervalo.
 - sistema['Geral']['Carga']: MW de cada intervalo do dia selecionado.
 - VI[i]: volume inicial da UHE i.
-- AFL[i][t]: volume afluente incremental da UHE i no intervalo t.
-- vt/vv: volumes turbinado/vertido no intervalo, na mesma unidade de VI/AFL.
-- UHE['Engol']: limite de volume turbinado por intervalo.
-- UHE['Prod']: MW por unidade de volume turbinado no respectivo intervalo.
+- AFL[i][t]: volume afluente incremental da UHE i em hm³ no intervalo t.
+- VI, vt, vv e UHE['Engol']: volumes em hm³; vt, vv e Engol são por intervalo.
+- UHE['Prod']: MW/hm³, aplicado diretamente ao volume turbinado.
   Engol e Prod aceitam um valor constante ou uma lista por intervalo.
 - UTE['Rup'] e UTE['Rdown']: taxas máximas em MW/h. O limite em MW
   de cada intervalo é taxa * Duracao_h[t], incluindo t=0.
@@ -20,8 +19,8 @@ Entradas e unidades (nenhuma conversão é feita):
   Passo começa em 1 e indica o passo cumprido no PRIMEIRO intervalo do dia.
 - cortes: cortes fornecidos para o fim do dia iest, aplicados ao volume terminal.
 
-A geração hidráulica usa Prod * vt. Se vt for vazão, adapte o balanço hídrico
-antes de usar esta função. Esta versão não adiciona cascatas hidráulicas.
+A geração hidráulica usa diretamente Prod * vt, sem conversão de unidades.
+Esta versão não adiciona cascatas hidráulicas.
 Inclui as rampas 10.17 e 10.18, usando o indicador de trajetória do período
 atual, como nas equações fornecidas. Não inclui custos de acionamento/desligamento.
 As trajetórias, aqui, prescrevem a potência por intervalo, não pontos de uma

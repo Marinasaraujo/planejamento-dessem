@@ -53,6 +53,23 @@ def receber_json():
     return dados
 
 
+def numero_opcional_nao_negativo(dados, campo, rotulo):
+    """Lê um número opcional do JSON; vazio significa usar o default."""
+    valor = dados.get(campo)
+    if valor is None or (isinstance(valor, str) and not valor.strip()):
+        return None
+
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError, OverflowError) as erro:
+        abort(400, description=f"{rotulo} deve ser numérico.")
+
+    if not math.isfinite(numero) or numero < 0:
+        abort(400, description=f"{rotulo} deve ser finito e não negativo.")
+
+    return numero
+
+
 def selecionar(catalogo, codigos, rotulo):
     """Busca os códigos recebidos nos dados guardados no Python."""
 
@@ -189,11 +206,6 @@ def api_carregar_deck():
         data_referencia=referencia,
         **catalogos,
 
-        historico={
-            "anos": [],
-            "permite_media": False,
-        },
-
         avisos=[
             "Nesta etapa são consultados os catálogos; "
             "a carga DP será extraída após a seleção do submercado; "
@@ -268,8 +280,15 @@ def api_consultar_selecao():
             erro=f"Não foi possível consultar a carga: {erro}"
         ), 400
 
-    if dados.get("fonte_afluencias", "deck") != "deck":
-        abort(400, description="A base histórica de afluências ainda não foi conectada.")
+    afluencia = numero_opcional_nao_negativo(
+        dados, "afluencia", "Afluência"
+    )
+    produtibilidade = numero_opcional_nao_negativo(
+        dados, "produtibilidade", "Produtibilidade"
+    )
+    engolimento = numero_opcional_nao_negativo(
+        dados, "engolimento", "Engolimento"
+    )
 
     try:
         sistema = montar_sistema(
@@ -278,6 +297,9 @@ def api_consultar_selecao():
             caso=deck["caso"],
             carga=carga,
             codigo_submercado=submercado["codigo"],
+            afluencia=afluencia,
+            produtibilidade=produtibilidade,
+            engolimento=engolimento,
         )
     except (ValueError, KeyError, TypeError) as erro:
         return jsonify(erro=f"Não foi possível montar o sistema: {erro}"), 400
@@ -309,11 +331,43 @@ def api_consultar_selecao():
             "codigos_ute": [u["codigo"] for u in ute],
             "codigo_submercado": submercado["codigo"],
             "multiplicador_carga": multiplicador_carga,
-            "fonte_afluencias_solicitada": "deck",
+            "afluencia": afluencia,
+            "produtibilidade": produtibilidade,
+            "engolimento": engolimento,
         },
-        uhe=[{**dados, "volume_inicial_hm3":modelo["VI"], "origem_volume_inicial":"default"}
-             for dados, modelo in zip(uhe, sistema["UHE"])],
-        ute=ute,
+        uhe=[
+            {
+                **dados,
+                "volume_inicial_hm3": modelo["VI"],
+                "origem_volume_inicial": "default",
+                "produtibilidade": modelo["Prod"],
+                "engolimento_hm3": modelo["Engol"],
+                "afluencia_hm3": modelo["Afl"][0],
+                "intervalos_afluencia": len(modelo["Afl"]),
+            }
+            for dados, modelo in zip(uhe, sistema["UHE"])
+        ],
+        ute=[
+            {
+                **dados,
+                "capacidade_mw": modelo["Cap"],
+                "potencia_minima_mw": modelo["Pmin"],
+                "custo": modelo["Custo"],
+                "tempo_ligada_h": modelo["Ton_h"],
+                "tempo_desligada_h": modelo["Toff_h"],
+                "rampa_subida_mw": modelo["Rup"],
+                "rampa_descida_mw": modelo["Rdown"],
+                "status_inicial": modelo["Status_inicial"],
+                "tempo_status_inicial_h": modelo["Tempo_status_inicial_h"],
+                "geracao_inicial_mw": modelo["Geracao_inicial"],
+                "trajetoria_partida": modelo["Traj_partida"],
+                "trajetoria_parada": modelo["Traj_parada"],
+                "potencias_partida": modelo["TrUp"],
+                "potencias_parada": modelo["TrDn"],
+                "trajetoria_inicial": modelo["Trajetoria_inicial"],
+            }
+            for dados, modelo in zip(ute, sistema["UTE"])
+        ],
 
         periodos=[],
         carga=carga,

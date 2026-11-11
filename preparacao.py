@@ -30,7 +30,7 @@ DEFAULTS_UHE = {
     "Fracao_volume_util_inicial": 0.5,
     "Prod": 0.26,
     "Engol": 317.9,
-    "Afluencia_hm3s": 0.13,
+    "Afluencia_hm3": 0.13,
 }
 
 # Um único padrão para todas as UTEs; não atribuímos GT_1/GT_2 pela ordem.
@@ -158,6 +158,9 @@ def montar_sistema(
     caso=None,
     carga=None,
     codigo_submercado=None,
+    afluencia=None,
+    produtibilidade=None,
+    engolimento=None,
 ):
     """Recebe as usinas SELECIONADAS e retorna apenas Geral, UHE e UTE."""
     geral = deepcopy(DEFAULTS_GERAL)
@@ -172,6 +175,22 @@ def montar_sistema(
     geral["Nr_Est"] = len(geral["Duracao_h"])
     n_periodos = geral["Nr_Est"]
 
+    afluencia = (
+        DEFAULTS_UHE["Afluencia_hm3"]
+        if afluencia is None
+        else _nao_negativo(afluencia, "Afluência")
+    )
+    produtibilidade = (
+        DEFAULTS_UHE["Prod"]
+        if produtibilidade is None
+        else _nao_negativo(produtibilidade, "Produtibilidade")
+    )
+    engolimento = (
+        DEFAULTS_UHE["Engol"]
+        if engolimento is None
+        else _nao_negativo(engolimento, "Engolimento")
+    )
+
     fracao = _numero(DEFAULTS_UHE["Fracao_volume_util_inicial"], "Fração do volume útil")
     if not 0 <= fracao <= 1:
         raise ValueError("A fração inicial do volume útil deve estar entre 0 e 1.")
@@ -185,9 +204,9 @@ def montar_sistema(
             "VI": vmin + fracao * (vmax - vmin),
             "Vmax": vmax,
             "Vmin": vmin,
-            "Prod": DEFAULTS_UHE["Prod"],
-            "Engol": DEFAULTS_UHE["Engol"],
-            "Afl": [DEFAULTS_UHE["Afluencia_hm3s"]] * n_periodos,
+            "Prod": produtibilidade,
+            "Engol": engolimento,
+            "Afl": [afluencia] * n_periodos,
         })
 
     lista_ute = []
@@ -233,9 +252,9 @@ def origens_dados():
             "Vmin": "HIDR: vol_min, em hm³; sem aplicar alterações de AC/restrições operativas.",
             "Vmax": "HIDR: vol_max, em hm³; sem aplicar alterações de AC/restrições operativas.",
             "VI": f"Default calculado: Vmin + {DEFAULTS_UHE['Fracao_volume_util_inicial']} × (Vmax − Vmin); não é o volume inicial do deck.",
-            "Prod": "Default constante em MW/(m³/s); não é a produtibilidade específica do HIDR.",
-            "Engol": "Default em m³/s.",
-            "Afl": "Default determinístico em m³/s por intervalo; não extraído do DADVAZ e sem tratamento da cascata.",
+            "Prod": "Valor informado pelo usuário ou default constante em MW/hm³.",
+            "Engol": "Valor informado pelo usuário ou default em hm³ por intervalo.",
+            "Afl": "Valor informado pelo usuário ou default constante em hm³ por intervalo.",
         },
         "UTE": {
             "Nome": "Nome do catálogo selecionado (TERMDAT no dashboard atual).",

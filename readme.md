@@ -175,9 +175,9 @@ O horizonte padrão soma 24 horas. `Nr_Est` representa intervalos, não meses. O
 | `Vmin` | hm³ | `HIDR`, campo `vol_min`. |
 | `Vmax` | hm³ | `HIDR`, campo `vol_max`. |
 | `VI` | hm³ | Default calculado: `Vmin + 0.5 * (Vmax - Vmin)`. |
-| `Prod` | MW/(m³/s) | Default constante: `0.95`. Não é a produtibilidade específica do `HIDR`. |
-| `Engol` | m³/s | Default: `60.0`. |
-| `Afl` | Lista de m³/s por intervalo | Default determinístico: `[23.0] * Nr_Est`. |
+| `Prod` | MW/hm³ | Default constante definido em `preparacao.py`. |
+| `Engol` | hm³ por intervalo | Default definido em `preparacao.py`. |
+| `Afl` | Lista de hm³ por intervalo | Default constante definido em `preparacao.py`. |
 
 O default de `VI` corresponde a 50% do volume útil. Ainda não é o volume inicial extraído do deck. A contribuição de montante e a cascata não são tratadas nesta preparação.
 

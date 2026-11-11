@@ -29,9 +29,9 @@ document.addEventListener("DOMContentLoaded", () => {
     limparUte: elemento("limpar-ute"),
     submercado: elemento("submercado"),
     multiplicadorCarga: elemento("multiplicador-carga"),
-
-    fonte: elemento("fonte-afluencias"),
-    ano: elemento("ano-afluencias"),
+    afluencia: elemento("afluencia"),
+    produtibilidade: elemento("produtibilidade"),
+    engolimento: elemento("engolimento"),
 
     statusApp: elemento("status-aplicacao"),
     statusDeck: elemento("status-deck"),
@@ -41,7 +41,6 @@ document.addEventListener("DOMContentLoaded", () => {
     tabelaUte: elemento("corpo-tabela-ute"),
 
     carga: elemento("dados-carga"),
-    afluencias: elemento("dados-afluencias"),
     json: elemento("json-caso"),
     resultadosOtimizacao: elemento("resultados-otimizacao"),
     metricasOtimizacao: elemento("metricas-otimizacao"),
@@ -164,7 +163,9 @@ document.addEventListener("DOMContentLoaded", () => {
       tela.ute,
       tela.submercado,
       tela.multiplicadorCarga,
-      tela.fonte
+      tela.afluencia,
+      tela.produtibilidade,
+      tela.engolimento
     ]) {
       campo.disabled = estado.ocupado || semDeck;
     }
@@ -177,11 +178,6 @@ document.addEventListener("DOMContentLoaded", () => {
       botao.disabled = estado.ocupado || semDeck ||
         selecionados(botao === tela.limparUhe ? tela.uhe : tela.ute).length === 0;
     }
-
-    tela.ano.disabled =
-      estado.ocupado ||
-      semDeck ||
-      tela.fonte.value !== "ano_historico";
 
     tela.preparar.disabled = estado.ocupado || semDeck;
     tela.otimizar.disabled = estado.ocupado || semDeck ||
@@ -220,43 +216,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       select.add(opcao);
     }
-  }
-
-  // Libera as opções históricas conforme a base disponível no Python.
-  function configurarHistorico(historico = {}) {
-    const anos = historico.anos ?? [];
-
-    tela.ano.replaceChildren(
-      new Option("Selecione um ano", "", true, true)
-    );
-
-    for (const ano of anos) {
-      tela.ano.add(
-        new Option(String(ano), String(ano))
-      );
-    }
-
-    for (const opcao of tela.fonte.options) {
-      if (opcao.value === "ano_historico") {
-        opcao.disabled = anos.length === 0;
-
-        opcao.textContent = opcao.disabled
-          ? "Ano histórico — requer base histórica"
-          : "Ano histórico";
-
-      } else if (opcao.value === "media_historica") {
-        opcao.disabled = historico.permite_media !== true;
-
-        opcao.textContent = opcao.disabled
-          ? "Médias históricas — requer base histórica"
-          : "Médias históricas";
-
-      } else {
-        opcao.disabled = false;
-      }
-    }
-
-    tela.fonte.value = "deck";
   }
 
   // 4. Funções para apresentar os dados.
@@ -302,25 +261,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function mostrarSerie(destino, linhas, colunas, descricao) {
-    if (destino === tela.carga || destino === tela.afluencias) {
-      if (destino === tela.carga) {
-        criarGrafico(
-          destino,
-          [{ nome: "Carga (MW)", valores: linhas }],
-          descricao
-        );
-        return;
-      }
-
-      const porUsina = new Map();
-      for (const registro of linhas) {
-        const codigo = String(registro.codigo_usina ?? "Afluência");
-        if (!porUsina.has(codigo)) porUsina.set(codigo, []);
-        porUsina.get(codigo).push(Number(registro.vazao_m3s));
-      }
+    if (destino === tela.carga) {
       criarGrafico(
         destino,
-        [...porUsina.entries()].map(([nome, valores]) => ({ nome, valores })),
+        [{ nome: "Carga (MW)", valores: linhas }],
         descricao
       );
       return;
@@ -369,20 +313,35 @@ document.addEventListener("DOMContentLoaded", () => {
       "nome",
       "volume_min_hm3",
       "volume_max_hm3",
-      "volume_inicial_hm3"
+      "volume_inicial_hm3",
+      "produtibilidade",
+      "engolimento_hm3",
+      "afluencia_hm3",
+      "intervalos_afluencia"
     ]);
 
     preencherTabela(tela.tabelaUte, [], [
       "codigo",
       "nome",
-      "unidade"
+      "capacidade_mw",
+      "potencia_minima_mw",
+      "custo",
+      "tempo_ligada_h",
+      "tempo_desligada_h",
+      "rampa_subida_mw",
+      "rampa_descida_mw",
+      "status_inicial",
+      "tempo_status_inicial_h",
+      "geracao_inicial_mw",
+      "trajetoria_partida",
+      "trajetoria_parada",
+      "potencias_partida",
+      "potencias_parada",
+      "trajetoria_inicial"
     ]);
 
     tela.carga.textContent =
       "Aguardando consulta da carga.";
-
-    tela.afluencias.textContent =
-      "Aguardando consulta das afluências.";
 
     tela.json.textContent =
       "Nenhum dado preparado.";
@@ -432,7 +391,6 @@ document.addEventListener("DOMContentLoaded", () => {
       "Aguardando leitura do deck"
     );
 
-    configurarHistorico();
     limparResultados();
 
     tela.statusDeck.textContent =
@@ -560,8 +518,6 @@ document.addEventListener("DOMContentLoaded", () => {
         "Selecione o submercado"
       );
 
-      configurarHistorico(dados.historico);
-
       estado.deckId = dados.deck_id;
 
       const avisos = dados.avisos?.length
@@ -598,16 +554,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (
-      tela.fonte.value === "ano_historico" &&
-      !tela.ano.value
-    ) {
-      tela.statusSelecao.textContent =
-        "Selecione o ano das afluências.";
-
-      return;
-    }
-
     estado.ocupado = true;
     atualizarControles();
 
@@ -623,18 +569,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         codigo_submercado: tela.submercado.value,
         multiplicador_carga: Number(tela.multiplicadorCarga.value),
-        fonte_afluencias: tela.fonte.value,
-
-        ano_afluencias: tela.fonte.value === "ano_historico"
-          ? Number(tela.ano.value)
-          : null
+        afluencia: tela.afluencia.value === ""
+          ? null
+          : Number(tela.afluencia.value),
+        produtibilidade: tela.produtibilidade.value === ""
+          ? null
+          : Number(tela.produtibilidade.value),
+        engolimento: tela.engolimento.value === ""
+          ? null
+          : Number(tela.engolimento.value)
       });
 
       for (const campo of [
         "uhe",
         "ute",
-        "carga",
-        "afluencias"
+        "carga"
       ]) {
         if (!Array.isArray(caso[campo])) {
           throw new Error(
@@ -648,13 +597,31 @@ document.addEventListener("DOMContentLoaded", () => {
         "nome",
         "volume_min_hm3",
         "volume_max_hm3",
-        "volume_inicial_hm3"
+        "volume_inicial_hm3",
+        "produtibilidade",
+      "engolimento_hm3",
+      "afluencia_hm3",
+        "intervalos_afluencia"
       ]);
 
       preencherTabela(tela.tabelaUte, caso.ute, [
         "codigo",
         "nome",
-        "unidade"
+        "capacidade_mw",
+        "potencia_minima_mw",
+        "custo",
+        "tempo_ligada_h",
+        "tempo_desligada_h",
+        "rampa_subida_mw",
+        "rampa_descida_mw",
+        "status_inicial",
+        "tempo_status_inicial_h",
+        "geracao_inicial_mw",
+        "trajetoria_partida",
+        "trajetoria_parada",
+        "potencias_partida",
+        "potencias_parada",
+        "trajetoria_inicial"
       ]);
 
       mostrarSerie(
@@ -667,19 +634,6 @@ document.addEventListener("DOMContentLoaded", () => {
           { campo: "valor_mw", titulo: "Carga (MW)" }
         ],
         "Carga do submercado selecionado"
-      );
-
-      mostrarSerie(
-        tela.afluencias,
-        caso.afluencias,
-        [
-          { campo: "codigo_usina", titulo: "Código da UHE" },
-          { campo: "inicio", titulo: "Início" },
-          { campo: "fim", titulo: "Fim" },
-          { campo: "vazao_m3s", titulo: "Afluência (m³/s)" },
-          { campo: "tipo", titulo: "Tipo de vazão" }
-        ],
-        "Afluências das UHEs selecionadas"
       );
 
       // Mostra o objeto completo, com indentação de dois espaços.
@@ -817,8 +771,9 @@ document.addEventListener("DOMContentLoaded", () => {
     tela.ute,
     tela.submercado,
     tela.multiplicadorCarga,
-    tela.fonte,
-    tela.ano
+    tela.afluencia,
+    tela.produtibilidade,
+    tela.engolimento
   ]) {
     campo.addEventListener("change", () => {
       limparResultados();
