@@ -277,11 +277,12 @@ def api_consultar_selecao():
             ute,
             caso=deck["caso"],
             carga=carga,
+            codigo_submercado=submercado["codigo"],
         )
     except (ValueError, KeyError, TypeError) as erro:
         return jsonify(erro=f"Não foi possível montar o sistema: {erro}"), 400
 
-    pendencias = ["Durações de 0,5 h e custo de déficit default."]
+    pendencias = ["Durações de 0,5 h; custo de déficit lido do registro CD."]
     if uhe:
         pendencias.append("VI calculado a 50% do volume útil; Prod, Engol e Afl defaults. Cascata ainda não tratada.")
     if ute:

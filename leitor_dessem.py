@@ -472,6 +472,77 @@ def listar_demandas(caso, codigo_submercado):
 
     return carga
 
+
+def ler_custo_deficit(caso, codigo_submercado=None):
+    """Retorna o custo de déficit do registro CD do ENTDADOS.
+
+    O modelo atual usa um único custo escalar. Por isso, quando o deck
+    informar mais de um registro CD, todos os custos selecionados precisam
+    ser iguais; caso contrário, a conversão para um escalar seria ambígua.
+    """
+
+    dados = getattr(caso, "dadger", None)
+    bloco = getattr(dados, "bloco_cd", None)
+    tabela = bloco.get("df") if isinstance(bloco, dict) else None
+
+    if tabela is None or tabela.empty:
+        raise ValueError(
+            "A tabela CD (CUSTO DE DEFICIT) do ENTDADOS "
+            "não está disponível ou está vazia."
+        )
+
+    colunas = ["is", "cd", "custo"]
+    if not set(colunas).issubset(tabela.columns):
+        raise ValueError(
+            f"Colunas esperadas em CD: {colunas}. "
+            f"Encontradas: {list(tabela.columns)}"
+        )
+
+    registros = tabela[colunas]
+    if codigo_submercado is not None:
+        codigo = str(codigo_submercado).strip()
+        registros = registros[
+            registros["is"].map(lambda valor: str(valor).strip() == codigo)
+        ]
+
+    if registros.empty:
+        identificacao = (
+            f" para o submercado {codigo_submercado}"
+            if codigo_submercado is not None
+            else ""
+        )
+        raise ValueError(
+            f"Nenhum custo de déficit encontrado{identificacao}."
+        )
+
+    custos = []
+    for posicao, valor in enumerate(registros["custo"], 1):
+        try:
+            custo = float(
+                str(valor).strip().replace("D", "E").replace("d", "e")
+            )
+        except (TypeError, ValueError, OverflowError) as erro:
+            raise ValueError(
+                f"Custo de déficit CD {posicao} inválido: {valor!r}"
+            ) from erro
+
+        if not math.isfinite(custo) or custo < 0:
+            raise ValueError(
+                f"Custo de déficit CD {posicao} inválido: {valor!r}"
+            )
+        custos.append(custo)
+
+    if any(
+        not math.isclose(custo, custos[0], rel_tol=0, abs_tol=1e-9)
+        for custo in custos[1:]
+    ):
+        raise ValueError(
+            "A tabela CD possui custos diferentes entre os patamares; "
+            "o modelo atual exige um único Custo_def."
+        )
+
+    return custos[0]
+
 def listar_catalogos(caso, fonte_termicas="termdat"):
     """Consulta as três listas usando o mesmo deck carregado."""
 

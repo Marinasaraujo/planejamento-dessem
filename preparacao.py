@@ -10,6 +10,8 @@ provisoriamente por um único gerador equivalente com os mesmos defaults.
 from copy import deepcopy
 from math import isfinite
 
+from leitor_dessem import ler_custo_deficit
+
 
 CARGA_HORARIA_PADRAO = [
     45., 44., 43., 42., 42., 44.,
@@ -150,9 +152,20 @@ def _parametros_ute_do_deck(caso, codigo):
     return parametros
 
 
-def montar_sistema(hidreletricas, termeletricas, caso=None, carga=None):
+def montar_sistema(
+    hidreletricas,
+    termeletricas,
+    caso=None,
+    carga=None,
+    codigo_submercado=None,
+):
     """Recebe as usinas SELECIONADAS e retorna apenas Geral, UHE e UTE."""
     geral = deepcopy(DEFAULTS_GERAL)
+    if caso is not None:
+        geral["Custo_def"] = ler_custo_deficit(
+            caso,
+            codigo_submercado=codigo_submercado,
+        )
     if carga is not None:
         geral["Carga"] = [float(valor) for valor in carga]
         geral["Duracao_h"] = [0.5] * len(geral["Carga"])
@@ -210,7 +223,7 @@ def origens_dados():
     """Mantém a rastreabilidade fora do dicionário exigido pelo modelo."""
     return {
         "Geral": {
-            "Custo_def": "Default, em R$/MWh.",
+            "Custo_def": "ENTDADOS, registro CD (CUSTO DE DEFICIT), em R$/MWh.",
             "Carga": "Default: perfil fictício de 24 horas repetido em meias horas; não é a carga do submercado.",
             "Duracao_h": "Default: 48 intervalos de 0,5 h; ainda não extraído de TM.",
             "Nr_Est": "Calculado como len(Duracao_h).",
