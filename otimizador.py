@@ -241,8 +241,8 @@ def despacho_milp(sistema, VI, AFL, cortes, iest, imprime=False):
         for t in range(n_periodos):
             volume_anterior = float(VI[i]) if t == 0 else vf[i][t - 1]
             restricao = modelo.addCons(
-                vf[i][t] + vt[i][t] + vv[i][t]
-                == volume_anterior + float(AFL[i][t]),
+                vf[i][t] + 0.0018*vt[i][t] + 0.0018*vv[i][t]
+                == volume_anterior + 0.0018*float(AFL[i][t]),
                 name=f'balanco_hidrico_{i}_{t}',
             )
             restricoes_uhe.append(restricao)
